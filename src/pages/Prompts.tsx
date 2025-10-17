@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { db, Prompt, PromptVersion } from "@/lib/db";
+import { db, Prompt, PromptVersion, type Settings } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import Playground from "@/components/Playground";
+import VariableEditor from "@/components/VariableEditor";
 
 const Prompts = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -21,6 +22,7 @@ const Prompts = () => {
   const [editingPrompt, setEditingPrompt] = useState({
     name: "",
     description: "",
+    type: "single-turn" as "single-turn" | "multi-turn",
     text: "",
     system_prompt: "",
     temperature: 0.7,
@@ -28,14 +30,22 @@ const Prompts = () => {
     top_p: 0.9,
     model: "gpt-4o-mini"
   });
+  
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [extractionPrompt, setExtractionPrompt] = useState("");
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
   const [promptToDelete, setPromptToDelete] = useState<Prompt | null>(null);
+  
   const [showVersionDeleteDialog, setShowVersionDeleteDialog] = useState(false);
+  
   const [versionToDelete, setVersionToDelete] = useState<{ promptId: string; versionId: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     loadPrompts();
+    loadSettings();
   }, []);
 
   const loadPrompts = async () => {
@@ -43,10 +53,49 @@ const Prompts = () => {
     setPrompts(allPrompts);
   };
 
+  const loadSettings = async () => {
+    try {
+      const settingsData = await db.settings.get("default");
+      setSettings(settingsData);
+      if (settingsData?.global_extraction_prompt) {
+        setExtractionPrompt(settingsData.global_extraction_prompt);
+      }
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+    }
+  };
+
+  const saveExtractionPrompt = async () => {
+    if (!settings) return;
+    
+    try {
+      const updatedSettings = {
+        ...settings,
+        global_extraction_prompt: extractionPrompt
+      };
+      
+      await db.settings.put(updatedSettings);
+      setSettings(updatedSettings);
+      
+      toast({
+        title: "Success",
+        description: "Extraction prompt saved successfully",
+      });
+    } catch (error) {
+      console.error("Failed to save extraction prompt:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save extraction prompt",
+        variant: "destructive",
+      });
+    }
+  };
+
   const createNewPrompt = async () => {
     const newPrompt: Prompt = {
       id: `prompt_${Date.now()}`,
       name: "New Prompt",
+      type: "single-turn",
       description: "",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -54,6 +103,7 @@ const Prompts = () => {
         v1: {
           version_id: "v1",
           text: "",
+          variables: {},
           config: {
             temperature: 0.7,
             max_tokens: 500,
@@ -82,6 +132,7 @@ const Prompts = () => {
     const updatedPrompt = {
       ...selectedPrompt,
       name: editingPrompt.name,
+      type: editingPrompt.type,
       description: editingPrompt.description,
       updated_at: new Date().toISOString(),
       versions: {
@@ -89,6 +140,7 @@ const Prompts = () => {
         [selectedVersion]: {
           ...version,
           text: editingPrompt.text,
+          variables: version.variables || {},
           config: {
             temperature: editingPrompt.temperature,
             max_tokens: editingPrompt.max_tokens,
@@ -115,6 +167,7 @@ const Prompts = () => {
     setEditingPrompt({
       name: prompt.name,
       description: prompt.description || "",
+      type: prompt.type || "single-turn",
       text: version.text,
       system_prompt: version.config.system_prompt,
       temperature: version.config.temperature,
@@ -136,6 +189,7 @@ const Prompts = () => {
     const newVersion: PromptVersion = {
       version_id: newVersionId,
       text: editingPrompt.text,
+      variables: {},
       config: {
         temperature: editingPrompt.temperature,
         max_tokens: editingPrompt.max_tokens,
@@ -218,6 +272,7 @@ const Prompts = () => {
         setEditingPrompt({
           name: updatedPrompt.name,
           description: updatedPrompt.description || "",
+          type: updatedPrompt.type || "single-turn",
           text: v1Version.text,
           system_prompt: v1Version.config.system_prompt,
           temperature: v1Version.config.temperature,
@@ -248,6 +303,7 @@ const Prompts = () => {
     setEditingPrompt({
       name: selectedPrompt.name,
       description: selectedPrompt.description || "",
+      type: selectedPrompt.type || "single-turn",
       text: version.text,
       system_prompt: version.config.system_prompt,
       temperature: version.config.temperature,
@@ -345,6 +401,46 @@ const Prompts = () => {
                     className="text-sm text-muted-foreground border-none p-0 h-auto"
                     placeholder="Description"
                   />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Prompt Type</Label>
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="single-turn"
+                        name="prompt-type"
+                        value="single-turn"
+                        checked={editingPrompt.type === "single-turn"}
+                        onChange={(e) => setEditingPrompt({ ...editingPrompt, type: e.target.value as "single-turn" | "multi-turn" })}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="single-turn" className="text-sm font-normal cursor-pointer">
+                        Single Turn
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="multi-turn"
+                        name="prompt-type"
+                        value="multi-turn"
+                        checked={editingPrompt.type === "multi-turn"}
+                        onChange={(e) => setEditingPrompt({ ...editingPrompt, type: e.target.value as "single-turn" | "multi-turn" })}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="multi-turn" className="text-sm font-normal cursor-pointer">
+                        Multi Turn
+                      </Label>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {editingPrompt.type === "single-turn" 
+                      ? "Single turn prompts generate one response per user input"
+                      : "Multi turn prompts support ongoing conversations"
+                    }
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={savePrompt} size="sm">
@@ -459,6 +555,29 @@ const Prompts = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                <VariableEditor
+                  promptText={editingPrompt.text}
+                  systemPrompt={editingPrompt.system_prompt}
+                  variables={selectedPrompt?.versions[selectedVersion]?.variables || {}}
+                  onPromptChange={(text) => setEditingPrompt({ ...editingPrompt, text })}
+                  onSystemPromptChange={(system_prompt) => setEditingPrompt({ ...editingPrompt, system_prompt })}
+                  onVariablesChange={(variables) => {
+                    if (selectedPrompt) {
+                      const updatedPrompt = {
+                        ...selectedPrompt,
+                        versions: {
+                          ...selectedPrompt.versions,
+                          [selectedVersion]: {
+                            ...selectedPrompt.versions[selectedVersion],
+                            variables
+                          }
+                        }
+                      };
+                      setSelectedPrompt(updatedPrompt);
+                    }
+                  }}
+                />
               </div>
             </TabsContent>
 
@@ -528,6 +647,7 @@ const Prompts = () => {
               </Card>
             </TabsContent>
 
+           
             <TabsContent value="results" className="p-6">
               <Card>
                 <CardHeader>

@@ -13,7 +13,7 @@ interface DatasetMetadataDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   dataset?: Dataset;
-  onSave: (metadata: { name: string; type: "single-turn" | "multi-turn"; description?: string; tags?: string[] }) => void;
+  onSave: (metadata: { name: string; type: "single-turn" | "multi-turn"; description?: string; tags?: string[]; extraction_prompt?: string }) => void;
 }
 
 export const DatasetMetadataDialog = ({ open, onOpenChange, dataset, onSave }: DatasetMetadataDialogProps) => {
@@ -22,6 +22,7 @@ export const DatasetMetadataDialog = ({ open, onOpenChange, dataset, onSave }: D
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [extractionPrompt, setExtractionPrompt] = useState("");
 
   useEffect(() => {
     if (dataset) {
@@ -29,11 +30,13 @@ export const DatasetMetadataDialog = ({ open, onOpenChange, dataset, onSave }: D
       setType(dataset.type);
       setDescription(dataset.description || "");
       setTags(dataset.tags || []);
+      setExtractionPrompt(dataset.extraction_prompt || "");
     } else {
       setName("");
       setType("single-turn");
       setDescription("");
       setTags([]);
+      setExtractionPrompt("");
     }
     setTagInput("");
   }, [dataset, open]);
@@ -44,6 +47,7 @@ export const DatasetMetadataDialog = ({ open, onOpenChange, dataset, onSave }: D
       type,
       description: description || undefined,
       tags: tags.length > 0 ? tags : undefined,
+      extraction_prompt: extractionPrompt || undefined,
     });
     onOpenChange(false);
   };
@@ -111,6 +115,23 @@ export const DatasetMetadataDialog = ({ open, onOpenChange, dataset, onSave }: D
               rows={3}
             />
           </div>
+
+          {type === "multi-turn" && (
+            <div>
+              <Label htmlFor="extraction-prompt">Extraction Prompt (Optional)</Label>
+              <Textarea
+                id="extraction-prompt"
+                value={extractionPrompt}
+                onChange={(e) => setExtractionPrompt(e.target.value)}
+                placeholder="Enter custom extraction prompt for this dataset (leave empty to use global default)..."
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                This prompt will be used to extract dataset entries from multi-turn conversations. 
+                If left empty, the global extraction prompt will be used.
+              </p>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="tags">Tags</Label>

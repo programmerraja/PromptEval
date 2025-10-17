@@ -16,15 +16,19 @@ interface Variable {
 interface VariableEditorProps {
   promptText: string;
   systemPrompt: string;
+  variables: Record<string, string>;
   onPromptChange: (text: string) => void;
   onSystemPromptChange: (text: string) => void;
+  onVariablesChange: (variables: Record<string, string>) => void;
 }
 
 const VariableEditor = ({
   promptText,
   systemPrompt,
+  variables: propVariables,
   onPromptChange,
   onSystemPromptChange,
+  onVariablesChange,
 }: VariableEditorProps) => {
   const [variables, setVariables] = useState<Variable[]>([]);
   const [previewText, setPreviewText] = useState(promptText);
@@ -48,7 +52,7 @@ const VariableEditor = ({
     return result;
   };
 
-  // Initialize variables from prompt text
+  // Initialize variables from prompt text and prop variables
   useEffect(() => {
     const promptVars = extractVariables(promptText);
     const systemVars = extractVariables(systemPrompt);
@@ -56,30 +60,45 @@ const VariableEditor = ({
     
     const newVariables = allVars.map(key => ({
       key,
-      value: variables.find(v => v.key === key)?.value || ""
+      value: propVariables[key] || ""
     }));
     
     setVariables(newVariables);
-  }, [promptText, systemPrompt]);
+  }, [promptText, systemPrompt, propVariables]);
 
-  // Update preview when variables change
-  useEffect(() => {
-    setPreviewText(applySubstitution(promptText, variables));
-    setPreviewSystemPrompt(applySubstitution(systemPrompt, variables));
-  }, [promptText, systemPrompt, variables]);
 
   const handleVariableChange = (index: number, key: string, value: string) => {
     const newVariables = [...variables];
     newVariables[index] = { key, value };
     setVariables(newVariables);
+    
+    // Update parent with new variables
+    const newVariablesRecord: Record<string, string> = {};
+    newVariables.forEach(v => {
+      if (v.key.trim()) {
+        newVariablesRecord[v.key] = v.value;
+      }
+    });
+    onVariablesChange(newVariablesRecord);
   };
 
   const handleAddVariable = () => {
-    setVariables([...variables, { key: "", value: "" }]);
+    const newVariables = [...variables, { key: "", value: "" }];
+    setVariables(newVariables);
   };
 
   const handleRemoveVariable = (index: number) => {
-    setVariables(variables.filter((_, i) => i !== index));
+    const newVariables = variables.filter((_, i) => i !== index);
+    setVariables(newVariables);
+    
+    // Update parent with new variables
+    const newVariablesRecord: Record<string, string> = {};
+    newVariables.forEach(v => {
+      if (v.key.trim()) {
+        newVariablesRecord[v.key] = v.value;
+      }
+    });
+    onVariablesChange(newVariablesRecord);
   };
 
   const handleApplyVariables = () => {
@@ -92,7 +111,17 @@ const VariableEditor = ({
   };
 
   const handleResetVariables = () => {
-    setVariables(variables.map(v => ({ ...v, value: "" })));
+    const resetVariables = variables.map(v => ({ ...v, value: "" }));
+    setVariables(resetVariables);
+    
+    // Update parent with reset variables
+    const newVariablesRecord: Record<string, string> = {};
+    resetVariables.forEach(v => {
+      if (v.key.trim()) {
+        newVariablesRecord[v.key] = v.value;
+      }
+    });
+    onVariablesChange(newVariablesRecord);
   };
 
   return (
@@ -149,7 +178,7 @@ const VariableEditor = ({
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          {/* <div className="flex items-center justify-between">
             <Label className="text-sm font-medium">Preview</Label>
             <div className="flex gap-2">
               <Button
@@ -169,9 +198,9 @@ const VariableEditor = ({
                 Apply
               </Button>
             </div>
-          </div>
+          </div> */}
           
-          <div className="space-y-3">
+          {/* <div className="space-y-3">
             <div>
               <Label className="text-xs font-medium text-muted-foreground mb-2 block">System Prompt</Label>
               <Textarea
@@ -190,7 +219,7 @@ const VariableEditor = ({
                 placeholder="No prompt template"
               />
             </div>
-          </div>
+          </div> */}
         </div>
 
         {variables.length > 0 && (

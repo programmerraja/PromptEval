@@ -33,7 +33,7 @@ const Datasets = () => {
     setDatasets(allDatasets);
   };
 
-  const handleSaveMetadata = async (metadata: { name: string; type: "single-turn" | "multi-turn"; description?: string; tags?: string[] }) => {
+  const handleSaveMetadata = async (metadata: { name: string; type: "single-turn" | "multi-turn"; description?: string; tags?: string[]; extraction_prompt?: string }) => {
     if (selectedDataset) {
       const updated = { ...selectedDataset, ...metadata };
       await db.datasets.update(selectedDataset.id, updated);

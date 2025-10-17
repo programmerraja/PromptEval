@@ -22,6 +22,7 @@ interface ConversationTabsProps {
   onSendMessage: (conversationId: string, message: string) => void;
   onRegenerateMessage: (conversationId: string, messageIndex: number) => void;
   onCopyMessage: (content: string) => void;
+  promptType?: "single-turn" | "multi-turn";
 }
 
 const ConversationTabs = ({
@@ -33,6 +34,7 @@ const ConversationTabs = ({
   onSendMessage,
   onRegenerateMessage,
   onCopyMessage,
+  promptType = "multi-turn",
 }: ConversationTabsProps) => {
   const activeConversation = conversations.find(c => c.id === activeConversationId);
 
@@ -106,6 +108,7 @@ const ConversationTabs = ({
             onSendMessage={handleSendMessage}
             onRegenerateMessage={handleRegenerateMessage}
             onCopyMessage={onCopyMessage}
+            promptType={promptType}
           />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">

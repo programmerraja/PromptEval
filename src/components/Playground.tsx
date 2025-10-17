@@ -54,7 +54,12 @@ interface PlaygroundProps {
   prompt?: Prompt; // Optional prompt data for A/B testing
 }
 
-const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: PlaygroundProps) => {
+const Playground = ({
+  promptText,
+  systemPrompt,
+  onSaveConversation,
+  prompt,
+}: PlaygroundProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string>("");
   const [config, setConfig] = useState<LLMConfig>({
@@ -67,10 +72,17 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
   const [settings, setSettings] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"chat" | "ab-test">("chat");
   const [abTestConfigs, setAbTestConfigs] = useState<ABTestConfig[]>([]);
-  const [abTestConversations, setAbTestConversations] = useState<Record<string, ConversationMessage[]>>({});
-  const [abTestGenerating, setAbTestGenerating] = useState<Record<string, boolean>>({});
+  const [abTestConversations, setAbTestConversations] = useState<
+    Record<string, ConversationMessage[]>
+  >({});
+  const [abTestGenerating, setAbTestGenerating] = useState<
+    Record<string, boolean>
+  >({});
   const [processedPromptText, setProcessedPromptText] = useState(promptText);
-  const [processedSystemPrompt, setProcessedSystemPrompt] = useState(systemPrompt);
+  const [processedSystemPrompt, setProcessedSystemPrompt] =
+    useState(systemPrompt);
+  const [editableSystemPrompt, setEditableSystemPrompt] =
+    useState(systemPrompt);
   const [usageStats, setUsageStats] = useState({
     totalTokens: 0,
     promptTokens: 0,
@@ -89,6 +101,7 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
   useEffect(() => {
     setProcessedPromptText(promptText);
     setProcessedSystemPrompt(systemPrompt);
+    setEditableSystemPrompt(systemPrompt);
   }, [promptText, systemPrompt]);
 
   const getAIClient = (config: LLMConfig) => {
@@ -113,30 +126,39 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
   };
 
   const updateUsageStats = (usage: any, latency: number) => {
-    setUsageStats(prev => {
+    setUsageStats((prev) => {
       const newStats = {
         totalTokens: prev.totalTokens + (usage.totalTokens || 0),
         promptTokens: prev.promptTokens + (usage.promptTokens || 0),
         completionTokens: prev.completionTokens + (usage.completionTokens || 0),
         totalCost: prev.totalCost + (usage.totalCost || 0),
         requestCount: prev.requestCount + 1,
-        averageLatency: prev.requestCount === 0 ? latency : (prev.averageLatency * prev.requestCount + latency) / (prev.requestCount + 1),
+        averageLatency:
+          prev.requestCount === 0
+            ? latency
+            : (prev.averageLatency * prev.requestCount + latency) /
+              (prev.requestCount + 1),
       };
       return newStats;
     });
   };
 
-  const generateMessage = async (conversationId: string, userMessage: string): Promise<string> => {
+  const generateMessage = async (
+    conversationId: string,
+    userMessage: string
+  ): Promise<string> => {
     const client = getAIClient(config);
-    const conversation = conversations.find(c => c.id === conversationId);
+    const conversation = conversations.find((c) => c.id === conversationId);
     if (!conversation) throw new Error("Conversation not found");
-    
+
     const conversationHistory = [
       ...conversation.messages,
       { role: "user" as const, content: userMessage },
     ];
 
-    const fullSystemPrompt = processedSystemPrompt ? `${processedSystemPrompt}\n\n${processedPromptText}` : processedPromptText;
+    const fullSystemPrompt = processedSystemPrompt
+      ? `${processedSystemPrompt}\n\n${processedPromptText}`
+      : processedPromptText;
 
     const startTime = Date.now();
     const result = await generateText({
@@ -151,7 +173,7 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
     });
 
     const latency = Date.now() - startTime;
-    
+
     // Update usage statistics
     if (result.usage) {
       updateUsageStats(result.usage, latency);
@@ -163,7 +185,7 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
   const handleSendMessage = async (conversationId: string, message: string) => {
     if (!message.trim()) return;
 
-    const conversation = conversations.find(c => c.id === conversationId);
+    const conversation = conversations.find((c) => c.id === conversationId);
     if (!conversation || conversation.isGenerating) return;
 
     const userMessage: ConversationMessage = {
@@ -172,11 +194,13 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
     };
 
     // Update conversation with user message
-    setConversations(prev => prev.map(c => 
-      c.id === conversationId 
-        ? { ...c, messages: [...c.messages, userMessage], isGenerating: true }
-        : c
-    ));
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conversationId
+          ? { ...c, messages: [...c.messages, userMessage], isGenerating: true }
+          : c
+      )
+    );
 
     try {
       const response = await generateMessage(conversationId, message);
@@ -184,46 +208,64 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
         role: "assistant",
         content: response,
       };
-      
+
       // Update conversation with assistant message
-      setConversations(prev => prev.map(c => 
-        c.id === conversationId 
-          ? { ...c, messages: [...c.messages, assistantMessage], isGenerating: false }
-          : c
-      ));
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                messages: [...c.messages, assistantMessage],
+                isGenerating: false,
+              }
+            : c
+        )
+      );
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to generate response",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate response",
         variant: "destructive",
       });
-      
+
       // Reset generating state on error
-      setConversations(prev => prev.map(c => 
-        c.id === conversationId 
-          ? { ...c, isGenerating: false }
-          : c
-      ));
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId ? { ...c, isGenerating: false } : c
+        )
+      );
     }
   };
 
-  const handleRegenerateMessage = async (conversationId: string, messageIndex: number) => {
-    const conversation = conversations.find(c => c.id === conversationId);
+  const handleRegenerateMessage = async (
+    conversationId: string,
+    messageIndex: number
+  ) => {
+    const conversation = conversations.find((c) => c.id === conversationId);
     if (!conversation || conversation.isGenerating) return;
 
     // Find the user message that this assistant message is responding to
     const userMessageIndex = messageIndex - 1;
-    if (userMessageIndex < 0 || conversation.messages[userMessageIndex].role !== "user") return;
+    if (
+      userMessageIndex < 0 ||
+      conversation.messages[userMessageIndex].role !== "user"
+    )
+      return;
 
     const userMessage = conversation.messages[userMessageIndex].content;
     const messagesUpToUser = conversation.messages.slice(0, userMessageIndex);
-    
+
     // Update conversation to remove the assistant message and set generating state
-    setConversations(prev => prev.map(c => 
-      c.id === conversationId 
-        ? { ...c, messages: messagesUpToUser, isGenerating: true }
-        : c
-    ));
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conversationId
+          ? { ...c, messages: messagesUpToUser, isGenerating: true }
+          : c
+      )
+    );
 
     try {
       const response = await generateMessage(conversationId, userMessage);
@@ -231,26 +273,35 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
         role: "assistant",
         content: response,
       };
-      
+
       // Update conversation with new assistant message
-      setConversations(prev => prev.map(c => 
-        c.id === conversationId 
-          ? { ...c, messages: [...c.messages, assistantMessage], isGenerating: false }
-          : c
-      ));
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                messages: [...c.messages, assistantMessage],
+                isGenerating: false,
+              }
+            : c
+        )
+      );
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to regenerate response",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to regenerate response",
         variant: "destructive",
       });
-      
+
       // Reset generating state on error
-      setConversations(prev => prev.map(c => 
-        c.id === conversationId 
-          ? { ...c, isGenerating: false }
-          : c
-      ));
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId ? { ...c, isGenerating: false } : c
+        )
+      );
     }
   };
 
@@ -265,14 +316,14 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
       messages: [],
       isGenerating: false,
     };
-    
-    setConversations(prev => [...prev, newConversation]);
+
+    setConversations((prev) => [...prev, newConversation]);
     setActiveConversationId(newConversation.id);
   };
 
   const handleCloseConversation = (conversationId: string) => {
-    setConversations(prev => {
-      const filtered = prev.filter(c => c.id !== conversationId);
+    setConversations((prev) => {
+      const filtered = prev.filter((c) => c.id !== conversationId);
       if (activeConversationId === conversationId) {
         setActiveConversationId(filtered.length > 0 ? filtered[0].id : "");
       }
@@ -281,8 +332,14 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
   };
 
   const handleSaveConversation = () => {
-    const activeConversation = conversations.find(c => c.id === activeConversationId);
-    if (onSaveConversation && activeConversation && activeConversation.messages.length > 0) {
+    const activeConversation = conversations.find(
+      (c) => c.id === activeConversationId
+    );
+    if (
+      onSaveConversation &&
+      activeConversation &&
+      activeConversation.messages.length > 0
+    ) {
       onSaveConversation(activeConversation.messages);
       toast({
         title: "Saved",
@@ -301,7 +358,7 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
   // Initialize A/B test configs
   useEffect(() => {
     let configs: ABTestConfig[] = [];
-    
+
     if (prompt && Object.keys(prompt.versions).length > 0) {
       // Use all versions from the prompt for A/B testing
       configs = Object.entries(prompt.versions).map(([versionId, version]) => ({
@@ -342,7 +399,7 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
         },
       ];
     }
-    
+
     setAbTestConfigs(configs);
   }, [promptText, systemPrompt, config, prompt]);
 
@@ -350,7 +407,7 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
   const handleABTestSendMessage = async (configId: string, message: string) => {
     if (!message.trim()) return;
 
-    const config = abTestConfigs.find(c => c.id === configId);
+    const config = abTestConfigs.find((c) => c.id === configId);
     if (!config || abTestGenerating[configId]) return;
 
     const userMessage: ConversationMessage = {
@@ -359,11 +416,11 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
     };
 
     // Update conversation with user message
-    setAbTestConversations(prev => ({
+    setAbTestConversations((prev) => ({
       ...prev,
-      [configId]: [...(prev[configId] || []), userMessage]
+      [configId]: [...(prev[configId] || []), userMessage],
     }));
-    setAbTestGenerating(prev => ({ ...prev, [configId]: true }));
+    setAbTestGenerating((prev) => ({ ...prev, [configId]: true }));
 
     try {
       const response = await generateABTestMessage(config, message);
@@ -371,24 +428,30 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
         role: "assistant",
         content: response,
       };
-      
+
       // Update conversation with assistant message
-      setAbTestConversations(prev => ({
+      setAbTestConversations((prev) => ({
         ...prev,
-        [configId]: [...(prev[configId] || []), assistantMessage]
+        [configId]: [...(prev[configId] || []), assistantMessage],
       }));
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to generate response",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate response",
         variant: "destructive",
       });
     } finally {
-      setAbTestGenerating(prev => ({ ...prev, [configId]: false }));
+      setAbTestGenerating((prev) => ({ ...prev, [configId]: false }));
     }
   };
 
-  const generateABTestMessage = async (config: ABTestConfig, userMessage: string): Promise<string> => {
+  const generateABTestMessage = async (
+    config: ABTestConfig,
+    userMessage: string
+  ): Promise<string> => {
     const client = getAIClient({
       provider: "google", // Default to Google for A/B testing
       model: config.model,
@@ -396,13 +459,15 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
       maxTokens: config.maxTokens,
       topP: config.topP,
     });
-    
+
     const conversationHistory = [
       ...(abTestConversations[config.id] || []),
       { role: "user" as const, content: userMessage },
     ];
 
-    const fullSystemPrompt = config.systemPrompt ? `${config.systemPrompt}\n\n${config.promptText}` : config.promptText;
+    const fullSystemPrompt = config.systemPrompt
+      ? `${config.systemPrompt}\n\n${config.promptText}`
+      : config.promptText;
 
     const result = await generateText({
       model: client(config.model),
@@ -418,23 +483,27 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
     return result.text;
   };
 
-  const handleABTestRegenerateMessage = async (configId: string, messageIndex: number) => {
-    const config = abTestConfigs.find(c => c.id === configId);
+  const handleABTestRegenerateMessage = async (
+    configId: string,
+    messageIndex: number
+  ) => {
+    const config = abTestConfigs.find((c) => c.id === configId);
     if (!config || abTestGenerating[configId]) return;
 
     const messages = abTestConversations[configId] || [];
     const userMessageIndex = messageIndex - 1;
-    if (userMessageIndex < 0 || messages[userMessageIndex].role !== "user") return;
+    if (userMessageIndex < 0 || messages[userMessageIndex].role !== "user")
+      return;
 
     const userMessage = messages[userMessageIndex].content;
     const messagesUpToUser = messages.slice(0, userMessageIndex);
-    
+
     // Update conversation to remove the assistant message
-    setAbTestConversations(prev => ({
+    setAbTestConversations((prev) => ({
       ...prev,
-      [configId]: messagesUpToUser
+      [configId]: messagesUpToUser,
     }));
-    setAbTestGenerating(prev => ({ ...prev, [configId]: true }));
+    setAbTestGenerating((prev) => ({ ...prev, [configId]: true }));
 
     try {
       const response = await generateABTestMessage(config, userMessage);
@@ -442,34 +511,42 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
         role: "assistant",
         content: response,
       };
-      
+
       // Update conversation with new assistant message
-      setAbTestConversations(prev => ({
+      setAbTestConversations((prev) => ({
         ...prev,
-        [configId]: [...(prev[configId] || []), assistantMessage]
+        [configId]: [...(prev[configId] || []), assistantMessage],
       }));
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to regenerate response",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to regenerate response",
         variant: "destructive",
       });
     } finally {
-      setAbTestGenerating(prev => ({ ...prev, [configId]: false }));
+      setAbTestGenerating((prev) => ({ ...prev, [configId]: false }));
     }
   };
 
   const handleABTestClearConversation = (configId: string) => {
-    setAbTestConversations(prev => ({
+    setAbTestConversations((prev) => ({
       ...prev,
-      [configId]: []
+      [configId]: [],
     }));
   };
 
-  const handleUpdateABTestConfig = (configId: string, updates: Partial<ABTestConfig>) => {
-    setAbTestConfigs(prev => prev.map(config => 
-      config.id === configId ? { ...config, ...updates } : config
-    ));
+  const handleUpdateABTestConfig = (
+    configId: string,
+    updates: Partial<ABTestConfig>
+  ) => {
+    setAbTestConfigs((prev) =>
+      prev.map((config) =>
+        config.id === configId ? { ...config, ...updates } : config
+      )
+    );
   };
 
   const leftPanel = (
@@ -486,18 +563,21 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
               <TabsTrigger value="stats">Stats</TabsTrigger>
             </TabsList>
           </div>
-          
-          <TabsContent value="prompt" className="flex-1 p-4 space-y-4 overflow-y-auto">
+
+          <TabsContent
+            value="prompt"
+            className="flex-1 p-4 space-y-4 overflow-y-auto"
+          >
             <div className="space-y-2">
               <Label>System Prompt</Label>
               <Textarea
-                value={processedSystemPrompt}
-                readOnly
+                value={editableSystemPrompt}
+                onChange={(e) => setEditableSystemPrompt(e.target.value)}
                 className="min-h-[100px] text-sm"
-                placeholder="No system prompt"
+                placeholder="Enter system prompt..."
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label>User Prompt Template</Label>
               <Textarea
@@ -508,19 +588,18 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
               />
             </div>
 
-            {/* <VariableEditor
+            <VariableEditor
               promptText={promptText}
               systemPrompt={systemPrompt}
+              variables={{}}
               onPromptChange={setProcessedPromptText}
               onSystemPromptChange={setProcessedSystemPrompt}
-            /> */}
+              onVariablesChange={() => {}}
+            />
           </TabsContent>
 
           <TabsContent value="model" className="flex-1 p-4 overflow-y-auto">
-            <ModelSelector
-              config={config}
-              onConfigChange={setConfig}
-            />
+            <ModelSelector config={config} onConfigChange={setConfig} />
           </TabsContent>
 
           <TabsContent value="stats" className="flex-1 p-4 overflow-y-auto">
@@ -542,6 +621,7 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
         onSendMessage={handleSendMessage}
         onRegenerateMessage={handleRegenerateMessage}
         onCopyMessage={handleCopyMessage}
+        promptType={prompt?.type || "multi-turn"}
       />
     </div>
   );
@@ -553,7 +633,8 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
           <div>
             <h2 className="text-xl font-semibold">Interactive Playground</h2>
             <p className="text-sm text-muted-foreground">
-              Test your prompt with live AI responses • {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
+              Test your prompt with live AI responses • {conversations.length}{" "}
+              conversation{conversations.length !== 1 ? "s" : ""}
             </p>
           </div>
           <div className="flex gap-2">
@@ -561,7 +642,11 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
               <Button
                 size="sm"
                 onClick={handleSaveConversation}
-                disabled={!activeConversationId || conversations.find(c => c.id === activeConversationId)?.messages.length === 0}
+                disabled={
+                  !activeConversationId ||
+                  conversations.find((c) => c.id === activeConversationId)
+                    ?.messages.length === 0
+                }
               >
                 <Save className="h-4 w-4 mr-2" />
                 Save Conversation
@@ -570,16 +655,20 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
           </div>
         </div>
       </div>
-      
+
       <div className="flex-1 flex flex-col">
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "chat" | "ab-test")} className="flex-1 flex flex-col">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as "chat" | "ab-test")}
+          className="flex-1 flex flex-col"
+        >
           <div className="border-b px-4">
             <TabsList>
               <TabsTrigger value="chat">Chat</TabsTrigger>
               <TabsTrigger value="ab-test">A/B Testing</TabsTrigger>
             </TabsList>
           </div>
-          
+
           <TabsContent value="chat" className="flex-1">
             <ResizablePanel
               leftPanel={leftPanel}
@@ -589,7 +678,7 @@ const Playground = ({ promptText, systemPrompt, onSaveConversation, prompt }: Pl
               maxWidth={60}
             />
           </TabsContent>
-          
+
           <TabsContent value="ab-test" className="flex-1">
             <ABTestingPanel
               testConfigs={abTestConfigs}

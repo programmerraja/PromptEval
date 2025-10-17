@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, AlertCircle } from "lucide-react";
+import { Play, AlertCircle, Settings, FileText } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,16 +10,20 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useEffect } from "react";
-import { db, Dataset, Prompt, EvalResult, Conversation } from "@/lib/db";
+import { db, Dataset, Prompt, EvalResult, Conversation, EvaluationPrompt, Settings as AppSettings } from "@/lib/db";
 import { toast } from "@/hooks/use-toast";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import EvaluationPromptManager from "@/components/EvaluationPromptManager";
 
 const Evaluations = () => {
   const [activeTab, setActiveTab] = useState("config");
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [evalResults, setEvalResults] = useState<EvalResult[]>([]);
+  const [customEvalPrompts, setCustomEvalPrompts] = useState<EvaluationPrompt[]>([]);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [showPromptManager, setShowPromptManager] = useState(false);
   
   // Config state
   const [selectedDataset, setSelectedDataset] = useState<string>("");
@@ -31,9 +35,8 @@ const Evaluations = () => {
   const [topP, setTopP] = useState<number>(0.9);
   const [useCustomEvaluator, setUseCustomEvaluator] = useState<boolean>(false);
   const [evaluatorModel, setEvaluatorModel] = useState<string>("gpt-4o-mini");
-  const [evaluatorPrompt, setEvaluatorPrompt] = useState<string>(
-    `Evaluate the following conversation. Assess based on:\n- Task completion (1-5)\n- Tone and empathy (1-5)\n- Clarity (1-5)\n- Overall quality (1-5)\n\nReturn JSON:\n{\n  "task_completion": 4,\n  "tone": 5,\n  "clarity": 4,\n  "overall": 4.3,\n  "reason": "Detailed explanation..."\n}`
-  );
+  const [evaluatorPrompt, setEvaluatorPrompt] = useState<string>("");
+  const [selectedCustomPrompt, setSelectedCustomPrompt] = useState<string>("");
 
   // Run state
   const [isRunning, setIsRunning] = useState(false);
@@ -49,10 +52,19 @@ const Evaluations = () => {
     const datasetsData = await db.datasets.toArray();
     const promptsData = await db.prompts.toArray();
     const resultsData = await db.eval_results.toArray();
+    const customPromptsData = await db.evaluation_prompts.toArray();
+    const settingsData = await db.settings.get('default');
     
     setDatasets(datasetsData);
     setPrompts(promptsData);
     setEvalResults(resultsData);
+    setCustomEvalPrompts(customPromptsData);
+    setSettings(settingsData);
+    
+    // Set default evaluation prompt from settings
+    if (settingsData?.default_evaluation_prompt) {
+      setEvaluatorPrompt(settingsData.default_evaluation_prompt);
+    }
   };
 
   const getSelectedPrompt = () => {
@@ -383,13 +395,74 @@ const Evaluations = () => {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label>Evaluation Prompt</Label>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Evaluation Prompt</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPromptManager(true)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Manage Prompts
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="prompt-source">Prompt Source</Label>
+                      <Select 
+                        value={selectedCustomPrompt ? "custom" : "default"} 
+                        onValueChange={(value) => {
+                          if (value === "default") {
+                            setSelectedCustomPrompt("");
+                            setEvaluatorPrompt(settings?.default_evaluation_prompt || "");
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Default Evaluation Prompt</SelectItem>
+                          {customEvalPrompts.map((prompt) => (
+                            <SelectItem key={prompt.id} value={prompt.id}>
+                              {prompt.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {selectedCustomPrompt && (
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Using custom prompt: {customEvalPrompts.find(p => p.id === selectedCustomPrompt)?.name}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const prompt = customEvalPrompts.find(p => p.id === selectedCustomPrompt);
+                            if (prompt) {
+                              setEvaluatorPrompt(prompt.prompt);
+                            }
+                          }}
+                        >
+                          Load Prompt
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  
                   <Textarea 
                     value={evaluatorPrompt}
                     onChange={(e) => setEvaluatorPrompt(e.target.value)}
                     rows={8}
                     className="font-mono text-sm"
+                    placeholder="Enter evaluation prompt or select a custom prompt above..."
                   />
                 </div>
               </div>
@@ -483,6 +556,15 @@ const Evaluations = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <EvaluationPromptManager
+        isOpen={showPromptManager}
+        onClose={() => setShowPromptManager(false)}
+        onSelectPrompt={(prompt) => {
+          setSelectedCustomPrompt(prompt.id);
+          setEvaluatorPrompt(prompt.prompt);
+        }}
+      />
     </div>
   );
 };

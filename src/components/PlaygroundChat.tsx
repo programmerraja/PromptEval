@@ -5,9 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Send, Bot, User, Loader2, Copy, RotateCcw } from "lucide-react";
+import { Send, Bot, User, Loader2, Copy, RotateCcw, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConversationMessage } from "@/lib/db";
+import AddToDatasetDialog from "./AddToDatasetDialog";
 
 interface PlaygroundChatProps {
   messages: ConversationMessage[];
@@ -15,6 +16,7 @@ interface PlaygroundChatProps {
   onSendMessage: (message: string) => void;
   onRegenerateMessage: (messageIndex: number) => void;
   onCopyMessage: (content: string) => void;
+  promptType?: "single-turn" | "multi-turn";
 }
 
 const PlaygroundChat = ({
@@ -23,8 +25,10 @@ const PlaygroundChat = ({
   onSendMessage,
   onRegenerateMessage,
   onCopyMessage,
+  promptType = "multi-turn",
 }: PlaygroundChatProps) => {
   const [inputMessage, setInputMessage] = useState("");
+  const [showAddToDataset, setShowAddToDataset] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -61,10 +65,25 @@ const PlaygroundChat = ({
   return (
     <div className="flex flex-col h-full">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Playground Chat</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Test your prompt with live AI responses
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Playground Chat</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Test your prompt with live AI responses
+            </p>
+          </div>
+          {messages.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddToDataset(true)}
+              className="flex items-center gap-2"
+            >
+              <Database className="h-4 w-4" />
+              Add to Dataset
+            </Button>
+          )}
+        </div>
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col p-0">
@@ -122,7 +141,6 @@ const PlaygroundChat = ({
                               onClick={() => handleCopy(message.content)}
                             >
                               <Copy className="h-3 w-3 mr-1" />
-                              Copy
                             </Button>
                             <Button
                               size="sm"
@@ -131,7 +149,6 @@ const PlaygroundChat = ({
                               onClick={() => onRegenerateMessage(index)}
                             >
                               <RotateCcw className="h-3 w-3 mr-1" />
-                              Regenerate
                             </Button>
                           </div>
                         )}
@@ -200,6 +217,13 @@ const PlaygroundChat = ({
           </div>
         </div>
       </CardContent>
+
+      <AddToDatasetDialog
+        isOpen={showAddToDataset}
+        onClose={() => setShowAddToDataset(false)}
+        messages={messages}
+        promptType={promptType}
+      />
     </div>
   );
 };
