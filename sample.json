@@ -1,0 +1,333 @@
+{
+  "prompts": [
+    {
+      "id": "prompt_001",
+      "name": "Customer Support Assistant",
+      "folder": "customer-support",
+      "description": "AI assistant for handling customer support queries",
+      "created_at": "2025-01-15T10:15:00Z",
+      "updated_at": "2025-01-15T15:30:00Z",
+      "versions": {
+        "v1": {
+          "version_id": "v1",
+          "text": "You are a helpful customer support assistant. Please respond to user queries with empathy and provide clear solutions.",
+          "config": {
+            "temperature": 0.7,
+            "max_tokens": 500,
+            "top_p": 0.9,
+            "system_prompt": "You are a professional customer support agent for TechCorp."
+          },
+          "created_at": "2025-01-15T10:15:00Z",
+          "scores": {
+            "avg_score": 4.2,
+            "accuracy": 4.5,
+            "empathy": 4.0,
+            "clarity": 4.1
+          }
+        },
+        "v2": {
+          "version_id": "v2",
+          "text": "You are a helpful customer support assistant. Please respond to user queries with empathy, acknowledge their concerns, and provide step-by-step solutions. Always ask clarifying questions when needed.",
+          "config": {
+            "temperature": 0.6,
+            "max_tokens": 600,
+            "top_p": 0.8,
+            "system_prompt": "You are a professional customer support agent for TechCorp. Always be empathetic and solution-oriented."
+          },
+          "created_at": "2025-01-15T11:30:00Z",
+          "scores": {
+            "avg_score": 4.6,
+            "accuracy": 4.8,
+            "empathy": 4.7,
+            "clarity": 4.5
+          }
+        },
+        "v3": {
+          "version_id": "v3",
+          "text": "You are a helpful customer support assistant. Please respond to user queries with empathy, acknowledge their concerns, and provide step-by-step solutions. Always ask clarifying questions when needed. If you cannot resolve the issue, escalate to a human agent.",
+          "config": {
+            "temperature": 0.5,
+            "max_tokens": 700,
+            "top_p": 0.7,
+            "system_prompt": "You are a professional customer support agent for TechCorp. Always be empathetic, solution-oriented, and know when to escalate."
+          },
+          "created_at": "2025-01-15T14:45:00Z",
+          "scores": {
+            "avg_score": 4.8,
+            "accuracy": 4.9,
+            "empathy": 4.8,
+            "clarity": 4.7
+          }
+        }
+      }
+    },
+    {
+      "id": "prompt_002",
+      "name": "Technical Documentation Assistant",
+      "folder": "technical",
+      "description": "AI assistant for technical documentation and API help",
+      "created_at": "2025-01-15T12:00:00Z",
+      "updated_at": "2025-01-15T15:00:00Z",
+      "versions": {
+        "v1": {
+          "version_id": "v1",
+          "text": "You are a technical documentation assistant. Provide clear, accurate technical information and code examples.",
+          "config": {
+            "temperature": 0.3,
+            "max_tokens": 800,
+            "top_p": 0.9,
+            "system_prompt": "You are a technical documentation expert. Provide accurate, well-formatted technical information."
+          },
+          "created_at": "2025-01-15T12:00:00Z",
+          "scores": {
+            "avg_score": 4.4,
+            "accuracy": 4.7,
+            "technical_precision": 4.5,
+            "clarity": 4.2
+          }
+        }
+      }
+    }
+  ],
+  "datasets": [
+    {
+      "id": "ds_001",
+      "name": "Customer Support - Login Issues",
+      "type": "multi-turn",
+      "folder": "customer-support",
+      "description": "Multi-turn conversations for login-related customer support scenarios",
+      "created_at": "2025-01-15T10:30:00Z",
+      "tags": ["login", "support", "multi-turn"],
+      "entries": [
+        {
+          "id": "ds_001_entry_001",
+          "type": "multi-turn",
+          "title": "Password Reset Scenario",
+          "system_context": "The assistant is a helpful tech support agent for a SaaS product.",
+          "user_behavior": {
+            "style": "Conversational, frustrated but polite",
+            "formality": "semi-formal",
+            "goal": "user forget his password and assistant help him to reset his password his email is test@test.com",
+            "data": { "email": "test@test.com", "name": "John Doe" }
+          },
+          "conversation": [
+            { "role": "user", "content": "Hi, I'm having trouble logging in." }
+          ],
+          "created_at": "2025-01-15T10:30:00Z"
+        }
+      ]
+    },
+    {
+      "id": "ds_002",
+      "name": "Single-Turn Summarization",
+      "type": "single-turn",
+      "folder": "content",
+      "description": "Single-turn prompts for content summarization tasks",
+      "created_at": "2025-01-15T11:00:00Z",
+      "tags": ["summarization", "single-turn", "content"],
+      "entries": [
+        {
+          "id": "ds_002_entry_001",
+          "type": "single-turn",
+          "input": "Explain the concept of inflation in simple terms for a general audience.",
+          "expected_behavior": "Clear, concise explanation using simple language and relatable examples.",
+          "created_at": "2025-01-15T11:00:00Z"
+        },
+        {
+          "id": "ds_002_entry_002",
+          "type": "single-turn",
+          "input": "Summarize the key points of this technical documentation about API authentication.",
+          "expected_behavior": "Accurate technical summary highlighting main concepts and implementation steps.",
+          "created_at": "2025-01-15T11:15:00Z"
+        }
+      ]
+    }
+  ],
+  "conversations": [
+    {
+      "id": "conv_001",
+      "prompt_id": "prompt_001",
+      "prompt_version": "v2",
+      "model": "gpt-4o-mini",
+      "type": "manual",
+      "messages": [
+        { "role": "user", "content": "Hi, I'm having trouble logging in." },
+        {
+          "role": "assistant",
+          "content": "I'm sorry to hear you're having trouble logging in. I'd be happy to help you resolve this. What specific error message are you seeing when you try to log in?"
+        },
+        {
+          "role": "user",
+          "content": "It says 'invalid credentials' but I know my password is correct."
+        },
+        {
+          "role": "assistant",
+          "content": "I understand your frustration. Let's troubleshoot this step by step. First, could you please try resetting your password? I can send you a password reset link to your registered email address. What email address do you have on file with us?"
+        },
+        { "role": "user", "content": "my email is john.doe@example.com" },
+        {
+          "role": "assistant",
+          "content": "Perfect! I've sent a password reset link to john.doe@example.com. Please check your email (including spam folder) and click the link to reset your password. Once you've reset it, try logging in again. If you're still having issues after that, please let me know and I'll investigate further."
+        }
+      ],
+      "metadata": {
+        "context": "support_login_issue",
+        "status": "completed",
+        "dataset_ref": "ds_001_entry_001",
+        "turn_count": 6,
+        "date": "2025-01-15T12:45:00Z",
+        "user_profile_extracted": true
+      },
+      "usage": {
+        "prompt_tokens": 156,
+        "completion_tokens": 234,
+        "total_tokens": 390,
+        "latency": 2.3,
+        "cost_estimate": 0.0012
+      }
+    },
+    {
+      "id": "conv_002",
+      "prompt_id": "prompt_001",
+      "prompt_version": "v2",
+      "model": "gpt-4o-mini",
+      "type": "auto_eval",
+      "messages": [
+        {
+          "role": "user",
+          "content": "URGENT: My account is locked and I have a meeting in 10 minutes!"
+        },
+        {
+          "role": "assistant",
+          "content": "I understand this is urgent and I'll help you get back into your account quickly. Let me check your account status right away. Can you tell me your username or email address so I can look up your account?"
+        },
+        {
+          "role": "user",
+          "content": "username: jsmith, email: jsmith@company.com"
+        },
+        {
+          "role": "assistant",
+          "content": "I can see your account is temporarily locked due to multiple failed login attempts. I'm unlocking it now and resetting your password. You should receive a new temporary password via email in the next 2 minutes. Use that to log in immediately, and you can change it to something more memorable after your meeting."
+        },
+        {
+          "role": "user",
+          "content": "Thank you! I got the email. Will this work for my mobile app too?"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes, the temporary password will work for both web and mobile app. You're all set for your meeting! After your meeting, I recommend changing to a strong password and enabling two-factor authentication to prevent this from happening again."
+        }
+      ],
+      "metadata": {
+        "context": "urgent_account_unlock",
+        "status": "completed",
+        "dataset_ref": "ds_001_entry_002",
+        "turn_count": 6,
+        "date": "2025-01-15T13:15:00Z",
+        "simulated_user": true
+      },
+      "usage": {
+        "prompt_tokens": 189,
+        "completion_tokens": 267,
+        "total_tokens": 456,
+        "latency": 2.8,
+        "cost_estimate": 0.0014
+      }
+    }
+  ],
+  "evaluations": [
+    {
+      "id": "eval_001",
+      "conversation_id": "conv_001",
+      "prompt_id": "prompt_001",
+      "prompt_version": "v2",
+      "dataset_entry_id": "ds_001_entry_001",
+      "eval_type": "multi-turn",
+      "metrics": {
+        "task_success": 5,
+        "empathy": 4,
+        "logical_guidance": 5,
+        "overall": 4.7
+      },
+      "model_config": {
+        "model": "gpt-4o-mini",
+        "temperature": 0.5,
+        "max_tokens": 100,
+        "top_p": 0.9
+      },
+      "prompt": "Evaluate the following conversation between a support user and an assistant. Assess based on: Task completion, Tone, and Relevance.Conversation: {conversation} Expected Outcome: Assistant should guide user to recover password politely and efficiently."
+    }
+  ],
+  "eval_results": [
+    {
+      "id": "eval_001",
+      "conversation_id": "conv_001",
+      "prompt_id": "prompt_001",
+      "dataset_entry_id": "ds_001_entry_001",
+      "eval_type": "multi-turn",
+      "metrics": {
+        "task_success": 5,
+        "empathy": 4,
+        "logical_guidance": 5,
+        "overall": 4.7
+      },
+      "reason": "Assistant provided excellent step-by-step guidance with appropriate empathy. Successfully identified the issue and provided clear resolution path.",
+      "timestamp": "2025-01-15T12:50:00Z",
+      "cost": { "eval_tokens": 89, "cost_estimate": 0.0003 }
+    }
+  ],
+  "playground_sessions": [
+    {
+      "id": "playground_001",
+      "prompt_id": "prompt_001",
+      "prompt_version": "v3",
+      "model": "gpt-4o-mini",
+      "config": { "temperature": 0.5, "max_tokens": 700, "top_p": 0.7 },
+      "messages": [
+        {
+          "role": "user",
+          "content": "I need help with my subscription billing"
+        },
+        {
+          "role": "assistant",
+          "content": "I'd be happy to help you with your subscription billing. What specific issue are you experiencing? Are you having trouble with payment, need to change your plan, or have questions about charges?"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 45,
+        "completion_tokens": 67,
+        "total_tokens": 112,
+        "latency": 1.8,
+        "cost_estimate": 0.0003
+      },
+      "timestamp": "2025-01-15T15:00:00Z",
+      "saved_as_version": false,
+      "saved_as_dataset": false
+    }
+  ],
+  "export_metadata": {
+    "exported_at": "2025-01-15T15:30:00Z",
+    "export_version": "1.0.0",
+    "total_prompts": 2,
+    "total_conversations": 2,
+    "total_evaluations": 3,
+    "total_datasets": 2,
+    "total_user_profiles": 2,
+    "file_size_bytes": 15420
+  },
+  "settings": {
+    "dataset_generator_config": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.5,
+      "max_tokens": 100,
+      "top_p": 0.9,
+      "prompt": "You are analyzing a user–assistant conversation. Extract the following information: 1. User's communication style (tone, verbosity, emotion) 2. Conversational goal (task or intent) 3. Criteria for success (how to know assistant did a good job) 4. Example dialogue summary Return JSON:"
+    },
+    "default_model": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.5,
+      "max_tokens": 100,
+      "top_p": 0.9
+    }
+  }
+}
