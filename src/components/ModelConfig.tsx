@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { configService } from "@/services/configService";
 
 interface ModelConfigProps {
   model: string;
@@ -32,45 +33,14 @@ const ModelConfig = ({
   onTopPChange,
   title = "Model Configuration",
   description = "Configure model parameters",
-  showProvider = false,
+  showProvider = true,
   provider = "openai",
   onProviderChange,
   className = ""
 }: ModelConfigProps) => {
-  const openaiModels = [
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4-turbo",
-    "gpt-4",
-    "gpt-3.5-turbo"
-  ];
-
-  const anthropicModels = [
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
-    "claude-3-opus-20240229",
-    "claude-3-sonnet-20240229",
-    "claude-3-haiku-20240307"
-  ];
-
-  const googleModels = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-1.5-pro",
-    "gemini-1.5-flash"
-  ];
-
   const getModelsForProvider = (provider: string) => {
-    switch (provider) {
-      case "openai":
-        return openaiModels;
-      case "anthropic":
-        return anthropicModels;
-      case "google":
-        return googleModels;
-      default:
-        return openaiModels;
-    }
+    const providerConfig = configService.getProviderConfig(provider);
+    return providerConfig?.models.map(m => m.name) || [];
   };
 
   return (
@@ -103,11 +73,14 @@ const ModelConfig = ({
               <SelectValue placeholder="Select model" />
             </SelectTrigger>
             <SelectContent>
-              {getModelsForProvider(provider).map((modelOption) => (
-                <SelectItem key={modelOption} value={modelOption}>
-                  {modelOption}
-                </SelectItem>
-              ))}
+              {getModelsForProvider(provider).map((modelOption) => {
+                const modelConfig = configService.getModelConfig(provider, modelOption);
+                return (
+                  <SelectItem key={modelOption} value={modelOption}>
+                    {modelConfig?.displayName || modelOption}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>

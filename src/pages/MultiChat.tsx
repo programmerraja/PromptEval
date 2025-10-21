@@ -189,28 +189,7 @@ const MultiChat = () => {
     }
   };
 
-  const constructUserSystemPrompt = (datasetEntry: DatasetEntry): string => {
-    const parts = [];
-
-    if (datasetEntry.system_context) {
-      parts.push(datasetEntry.system_context);
-    }
-
-    if (datasetEntry.user_behavior) {
-      const behavior = datasetEntry.user_behavior;
-      if (behavior.style) {
-        parts.push(`Communication style: ${behavior.style}`);
-      }
-      if (behavior.formality) {
-        parts.push(`Formality level: ${behavior.formality}`);
-      }
-      if (behavior.goal) {
-        parts.push(`Your goal: ${behavior.goal}`);
-      }
-    }
-
-    return parts.join(". ") + ".";
-  };
+ 
 
   const generateMessage = async (
     config: LLMConfig,
@@ -282,7 +261,7 @@ const MultiChat = () => {
 
     const assistantSystemPrompt = `${promptVersion.config.system_prompt}\n\n${promptVersion.text}`;
 
-    const userSystemPrompt = constructUserSystemPrompt(datasetEntry);
+    const userSystemPrompt =`${datasetEntry.prompt || datasetEntry.input}`
 
     updateAssistantState({ messages: [], isGenerating: false });
     updateUserState({ messages: [], isGenerating: false });

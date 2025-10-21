@@ -26,6 +26,7 @@ const EvaluationPromptManager = ({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [promptName, setPromptName] = useState("");
   const [promptText, setPromptText] = useState("");
+  const [schema, setSchema] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -53,6 +54,7 @@ const EvaluationPromptManager = ({
     setEditingPrompt(null);
     setPromptName("");
     setPromptText("");
+    setSchema({});
     setShowEditDialog(true);
   };
 
@@ -60,6 +62,7 @@ const EvaluationPromptManager = ({
     setEditingPrompt(prompt);
     setPromptName(prompt.name);
     setPromptText(prompt.prompt);
+    setSchema(prompt.schema || {});
     setShowEditDialog(true);
   };
 
@@ -82,6 +85,7 @@ const EvaluationPromptManager = ({
           ...editingPrompt,
           name: promptName.trim(),
           prompt: promptText.trim(),
+          schema: schema,
         };
         await db.evaluation_prompts.update(editingPrompt.id, updatedPrompt);
         setPrompts(prev => prev.map(p => p.id === editingPrompt.id ? updatedPrompt : p));
@@ -96,6 +100,7 @@ const EvaluationPromptManager = ({
           id: `eval_prompt_${Date.now()}`,
           name: promptName.trim(),
           prompt: promptText.trim(),
+          schema: schema,
           created_at: new Date().toISOString(),
         };
         await db.evaluation_prompts.add(newPrompt);
@@ -111,6 +116,7 @@ const EvaluationPromptManager = ({
       setEditingPrompt(null);
       setPromptName("");
       setPromptText("");
+      setSchema({});
     } catch (error) {
       console.error("Failed to save evaluation prompt:", error);
       toast({
@@ -153,6 +159,7 @@ const EvaluationPromptManager = ({
     setEditingPrompt(null);
     setPromptName("");
     setPromptText("");
+    setSchema({});
     setShowEditDialog(false);
     onClose();
   };
@@ -227,16 +234,32 @@ const EvaluationPromptManager = ({
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Prompt Text</Label>
-                        <div className="p-3 bg-muted rounded-md">
-                          <p className="text-sm whitespace-pre-wrap">
-                            {prompt.prompt.length > 200 
-                              ? `${prompt.prompt.substring(0, 200)}...` 
-                              : prompt.prompt
-                            }
-                          </p>
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-sm font-medium">Prompt Text</Label>
+                          <div className="p-3 bg-muted rounded-md">
+                            <p className="text-sm whitespace-pre-wrap">
+                              {prompt.prompt.length > 200 
+                                ? `${prompt.prompt.substring(0, 200)}...` 
+                                : prompt.prompt
+                              }
+                            </p>
+                          </div>
                         </div>
+                        
+                        {prompt.schema && Object.keys(prompt.schema).length > 0 && (
+                          <div>
+                            <Label className="text-sm font-medium">JSON Schema</Label>
+                            <div className="p-3 bg-muted rounded-md">
+                              <pre className="text-xs font-mono whitespace-pre-wrap">
+                                {JSON.stringify(prompt.schema, null, 2).length > 150 
+                                  ? `${JSON.stringify(prompt.schema, null, 2).substring(0, 150)}...` 
+                                  : JSON.stringify(prompt.schema, null, 2)
+                                }
+                              </pre>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -291,6 +314,27 @@ const EvaluationPromptManager = ({
               <p className="text-xs text-muted-foreground mt-1">
                 This prompt should instruct the AI on how to evaluate conversations. 
                 It should specify the criteria and output format for evaluation results.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="schema">JSON Output Schema (Optional)</Label>
+              <Textarea
+                id="schema"
+                value={JSON.stringify(schema, null, 2)}
+                onChange={(e) => {
+                  try {
+                    const parsed = JSON.parse(e.target.value);
+                    setSchema(parsed);
+                  } catch {
+                    // Invalid JSON, keep the text but don't update schema
+                  }
+                }}
+                placeholder="Define the expected JSON output structure..."
+                className="min-h-[150px] font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Define the JSON structure that the evaluation should return. This helps ensure consistent output format.
               </p>
             </div>
           </div>

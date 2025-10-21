@@ -1,33 +1,63 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Play, AlertCircle, Settings, FileText } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useState, useEffect } from "react";
-import { db, Dataset, Prompt, EvalResult, Conversation, EvaluationPrompt, Settings as AppSettings } from "@/lib/db";
+import {
+  db,
+  Dataset,
+  Prompt,
+  EvalResult,
+  Conversation,
+  EvaluationPrompt,
+  Settings as AppSettings,
+} from "@/lib/db";
 import { toast } from "@/hooks/use-toast";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import EvaluationPromptManager from "@/components/EvaluationPromptManager";
 import ModelConfig from "@/components/ModelConfig";
+import SingleTurnEvaluation from "@/components/SingleTurnEvaluation";
 
 const Evaluations = () => {
   const [activeTab, setActiveTab] = useState("single-turn-eval");
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [evalResults, setEvalResults] = useState<EvalResult[]>([]);
-  const [customEvalPrompts, setCustomEvalPrompts] = useState<EvaluationPrompt[]>([]);
+  const [customEvalPrompts, setCustomEvalPrompts] = useState<
+    EvaluationPrompt[]
+  >([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [showPromptManager, setShowPromptManager] = useState(false);
-  
+
   // Config state
-  const [selectedDataset, setSelectedDataset] = useState<string>("");
+  const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<string>("");
   const [selectedVersion, setSelectedVersion] = useState<string>("");
   const [model, setModel] = useState<string>("gpt-4o-mini");
@@ -54,14 +84,14 @@ const Evaluations = () => {
     const promptsData = await db.prompts.toArray();
     const resultsData = await db.eval_results.toArray();
     const customPromptsData = await db.evaluation_prompts.toArray();
-    const settingsData = await db.settings.get('default');
-    
+    const settingsData = await db.settings.get("default");
+
     setDatasets(datasetsData);
     setPrompts(promptsData);
     setEvalResults(resultsData);
     setCustomEvalPrompts(customPromptsData);
     setSettings(settingsData);
-    
+
     // Set default evaluation prompt from settings
     if (settingsData?.default_evaluation_prompt) {
       setEvaluatorPrompt(settingsData.default_evaluation_prompt);
@@ -69,40 +99,40 @@ const Evaluations = () => {
   };
 
   const getSelectedPrompt = () => {
-    return prompts.find(p => p.id === selectedPrompt);
+    return prompts.find((p) => p.id === selectedPrompt);
   };
 
-  const getSelectedDataset = () => {
-    return datasets.find(d => d.id === selectedDataset);
+  const getSelectedDatasets = () => {
+    return datasets.filter((d) => selectedDatasets.includes(d.id));
   };
 
   const runEvaluation = async () => {
     // Validation
-    if (!selectedDataset || !selectedPrompt || !selectedVersion) {
+    if (selectedDatasets.length === 0 || !selectedPrompt || !selectedVersion) {
       toast({
         title: "Configuration incomplete",
-        description: "Please select dataset, prompt, and version.",
-        variant: "destructive"
+        description: "Please select at least one dataset, prompt, and version.",
+        variant: "destructive",
       });
       return;
     }
 
-    const settings = await db.settings.get('default');
-    const apiKey = settings?.api_keys?.openai;
+    const settings = await db.settings.get("default");
+    const apiKey = settings?.api_keys?.google;
 
     if (!apiKey) {
       toast({
         title: "API Key required",
         description: "Please add your OpenAI API key in Settings.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
-    const dataset = getSelectedDataset();
+    const selectedDatasetsList = getSelectedDatasets();
     const prompt = getSelectedPrompt();
-    
-    if (!dataset || !prompt) return;
+
+    if (selectedDatasetsList.length === 0 || !prompt) return;
 
     const promptVersion = prompt.versions[selectedVersion];
     if (!promptVersion) return;
@@ -113,27 +143,39 @@ const Evaluations = () => {
     setActiveTab("run");
 
     const openai = createOpenAI({ apiKey });
-    const entries = dataset.entries;
-    const totalEntries = entries.length;
+
+    // Combine all entries from selected datasets
+    const allEntries = selectedDatasetsList.flatMap((dataset) =>
+      dataset.entries.map((entry) => ({
+        ...entry,
+        datasetId: dataset.id,
+        datasetName: dataset.name,
+      }))
+    );
+    const totalEntries = allEntries.length;
 
     try {
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i];
-        setCurrentEntry(`Processing entry ${i + 1}/${totalEntries}: ${entry.title || entry.input?.substring(0, 50) || 'Untitled'}`);
+      for (let i = 0; i < allEntries.length; i++) {
+        const entry = allEntries[i];
+        setCurrentEntry(
+          `Processing entry ${i + 1}/${totalEntries} from ${
+            entry.datasetName
+          }: ${entry.title || entry.input?.substring(0, 50) || "Untitled"}`
+        );
 
         // Step 1: Generate conversation
         let conversation: Conversation;
-        
-        if (entry.type === 'single-turn') {
+
+        if (entry.type === "single-turn") {
           // Single-turn: generate one response
           const { text } = await generateText({
             model: openai(model),
             messages: [
-              { role: 'system', content: promptVersion.config.system_prompt },
-              { role: 'user', content: entry.input || '' }
+              { role: "system", content: promptVersion.config.system_prompt },
+              { role: "user", content: entry.input || "" },
             ],
             temperature,
-            topP
+            topP,
           });
 
           conversation = {
@@ -141,34 +183,37 @@ const Evaluations = () => {
             prompt_id: selectedPrompt,
             prompt_version: selectedVersion,
             model,
-            type: 'auto_eval',
+            type: "auto_eval",
             messages: [
-              { role: 'user', content: entry.input || '' },
-              { role: 'assistant', content: text }
+              { role: "user", content: entry.input || "" },
+              { role: "assistant", content: text },
             ],
             metadata: {
               dataset_ref: entry.id,
               date: new Date().toISOString(),
-              status: 'completed',
-              turn_count: 1
-            }
+              status: "completed",
+              turn_count: 1,
+            },
           };
         } else {
           // Multi-turn: simulate conversation
           const messages: any[] = [
-            { role: 'system', content: promptVersion.config.system_prompt }
+            { role: "system", content: promptVersion.config.system_prompt },
           ];
 
           if (entry.conversation && entry.conversation.length > 0) {
             // Use first user message from dataset
-            messages.push({ role: 'user', content: entry.conversation[0].content });
+            messages.push({
+              role: "user",
+              content: entry.conversation[0].content,
+            });
           }
 
           const { text } = await generateText({
             model: openai(model),
             messages,
             temperature,
-            topP
+            topP,
           });
 
           conversation = {
@@ -176,18 +221,18 @@ const Evaluations = () => {
             prompt_id: selectedPrompt,
             prompt_version: selectedVersion,
             model,
-            type: 'auto_eval',
+            type: "auto_eval",
             messages: [
-              { role: 'user', content: entry.conversation?.[0]?.content || '' },
-              { role: 'assistant', content: text }
+              { role: "user", content: entry.conversation?.[0]?.content || "" },
+              { role: "assistant", content: text },
             ],
             metadata: {
               dataset_ref: entry.id,
               date: new Date().toISOString(),
-              status: 'completed',
+              status: "completed",
               turn_count: entry.conversation?.length || 1,
-              simulated_user: true
-            }
+              simulated_user: true,
+            },
           };
         }
 
@@ -197,17 +242,17 @@ const Evaluations = () => {
         // Step 2: Evaluate the conversation
         const evalModelToUse = useCustomEvaluator ? evaluatorModel : model;
         const conversationText = conversation.messages
-          .map(m => `${m.role}: ${m.content}`)
-          .join('\n\n');
+          .map((m) => `${m.role}: ${m.content}`)
+          .join("\n\n");
 
         const evalPromptText = evaluatorPrompt
-          .replace('{conversation}', conversationText)
-          .replace('{expected_outcome}', entry.expected_behavior || entry.user_behavior?.goal || 'Complete the task successfully');
+          .replace("{conversation}", conversationText)
+          
 
         const { text: evalText } = await generateText({
           model: openai(evalModelToUse),
           prompt: evalPromptText,
-          temperature: 0.3
+          temperature: 0.3,
         });
 
         // Parse evaluation result
@@ -219,15 +264,16 @@ const Evaluations = () => {
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             metrics = {
-              task_completion: parsed.task_completion || parsed.task_success || 0,
+              task_completion:
+                parsed.task_completion || parsed.task_success || 0,
               tone: parsed.tone || parsed.empathy || 0,
               clarity: parsed.clarity || parsed.relevance || 0,
-              overall: parsed.overall || 0
+              overall: parsed.overall || 0,
             };
             reason = parsed.reason || evalText;
           }
         } catch (e) {
-          console.error('Failed to parse eval result:', e);
+          console.error("Failed to parse eval result:", e);
         }
 
         // Save evaluation result
@@ -242,8 +288,8 @@ const Evaluations = () => {
           timestamp: new Date().toISOString(),
           cost: {
             eval_tokens: 100,
-            cost_estimate: 0.001
-          }
+            cost_estimate: 0.001,
+          },
         };
 
         await db.eval_results.add(evalResult);
@@ -252,19 +298,19 @@ const Evaluations = () => {
       }
 
       await loadData();
-      
+
       toast({
         title: "Evaluation complete",
-        description: `Evaluated ${totalEntries} entries successfully.`
+        description: `Evaluated ${totalEntries} entries successfully.`,
       });
 
       setActiveTab("results");
     } catch (err: any) {
-      setError(err.message || 'Evaluation failed');
+      setError(err.message || "Evaluation failed");
       toast({
         title: "Evaluation failed",
-        description: err.message || 'An error occurred',
-        variant: "destructive"
+        description: err.message || "An error occurred",
+        variant: "destructive",
       });
     } finally {
       setIsRunning(false);
@@ -278,11 +324,13 @@ const Evaluations = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1>Evaluations</h1>
-          <p className="text-muted-foreground">Configure and run prompt evaluations</p>
+          <p className="text-muted-foreground">
+            Configure and run prompt evaluations
+          </p>
         </div>
         <Button onClick={runEvaluation} disabled={isRunning}>
           <Play className="h-4 w-4 mr-2" />
-          {isRunning ? 'Running...' : 'Run Evaluation'}
+          {isRunning ? "Running..." : "Run Evaluation"}
         </Button>
       </div>
 
@@ -296,161 +344,33 @@ const Evaluations = () => {
         </TabsList>
 
         <TabsContent value="single-turn-eval" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Single Turn Evaluation</CardTitle>
-              <CardDescription>Configure and run single-turn prompt evaluations</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Dataset</Label>
-                  <Select value={selectedDataset} onValueChange={setSelectedDataset}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select dataset" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {datasets.filter(d => d.type === 'single-turn').map(d => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name} ({d.entries.length} entries)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Prompt</Label>
-                  <Select value={selectedPrompt} onValueChange={(val) => {
-                    setSelectedPrompt(val);
-                    const prompt = prompts.find(p => p.id === val);
-                    if (prompt) {
-                      const versions = Object.keys(prompt.versions);
-                      setSelectedVersion(versions[versions.length - 1]);
-                    }
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select prompt" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {prompts.filter(p => p.type === 'single-turn').map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Prompt Version</Label>
-                  <Select value={selectedVersion} onValueChange={setSelectedVersion}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select version" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selectedPrompt && getSelectedPrompt() && 
-                        Object.keys(getSelectedPrompt()!.versions).map(v => (
-                          <SelectItem key={v} value={v}>{v}</SelectItem>
-                        ))
-                      }
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-4 border-t pt-4">
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    id="customEval"
-                    checked={useCustomEvaluator}
-                    onChange={(e) => setUseCustomEvaluator(e.target.checked)}
-                    className="rounded"
-                  />
-                  <Label htmlFor="customEval">Use different evaluator model</Label>
-                </div>
-
-                {useCustomEvaluator && (
-                  <div className="space-y-4 pl-6">
-                    <div className="space-y-2">
-                      <Label>Evaluator Model</Label>
-                      <Input value={evaluatorModel} onChange={(e) => setEvaluatorModel(e.target.value)} />
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Evaluation Prompt</Label>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowPromptManager(true)}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Manage Prompts
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="prompt-source">Prompt Source</Label>
-                      <Select 
-                        value={selectedCustomPrompt ? "custom" : "default"} 
-                        onValueChange={(value) => {
-                          if (value === "default") {
-                            setSelectedCustomPrompt("");
-                            setEvaluatorPrompt(settings?.default_evaluation_prompt || "");
-                          }
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default Evaluation Prompt</SelectItem>
-                          {customEvalPrompts.map((prompt) => (
-                            <SelectItem key={prompt.id} value={prompt.id}>
-                              {prompt.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {selectedCustomPrompt && (
-                      <div className="p-3 bg-muted rounded-md">
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Using custom prompt: {customEvalPrompts.find(p => p.id === selectedCustomPrompt)?.name}
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const prompt = customEvalPrompts.find(p => p.id === selectedCustomPrompt);
-                            if (prompt) {
-                              setEvaluatorPrompt(prompt.prompt);
-                            }
-                          }}
-                        >
-                          Load Prompt
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <Textarea 
-                    value={evaluatorPrompt}
-                    onChange={(e) => setEvaluatorPrompt(e.target.value)}
-                    rows={8}
-                    className="font-mono text-sm"
-                    placeholder="Enter evaluation prompt or select a custom prompt above..."
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <SingleTurnEvaluation
+            selectedDatasets={selectedDatasets}
+            onSelectedDatasetsChange={setSelectedDatasets}
+            selectedPrompt={selectedPrompt}
+            onSelectedPromptChange={setSelectedPrompt}
+            selectedVersion={selectedVersion}
+            onSelectedVersionChange={setSelectedVersion}
+            model={model}
+            temperature={temperature}
+            maxTokens={maxTokens}
+            topP={topP}
+            useCustomEvaluator={useCustomEvaluator}
+            onUseCustomEvaluatorChange={setUseCustomEvaluator}
+            evaluatorModel={evaluatorModel}
+            onEvaluatorModelChange={setEvaluatorModel}
+            evaluatorPrompt={evaluatorPrompt}
+            onEvaluatorPromptChange={setEvaluatorPrompt}
+            selectedCustomPrompt={selectedCustomPrompt}
+            onSelectedCustomPromptChange={setSelectedCustomPrompt}
+            isRunning={isRunning}
+            progress={progress}
+            currentEntry={currentEntry}
+            error={error}
+            onRunEvaluation={runEvaluation}
+            evalResults={evalResults}
+            prompts={prompts}
+          />
         </TabsContent>
 
         <TabsContent value="model-config" className="space-y-4">
@@ -463,8 +383,11 @@ const Evaluations = () => {
             onTemperatureChange={setTemperature}
             onMaxTokensChange={setMaxTokens}
             onTopPChange={setTopP}
-            title="Model Configuration"
-            description="Configure model parameters for evaluation"
+            onProviderChange= {()=>{}}
+            showProvider={true}
+            provider="google"
+            title="Model Parameters"
+            description="Configure the model settings for evaluation"
           />
         </TabsContent>
 
@@ -472,7 +395,9 @@ const Evaluations = () => {
           <Card>
             <CardHeader>
               <CardTitle>Evaluation Prompt Management</CardTitle>
-              <CardDescription>Manage evaluation prompts used for scoring conversations</CardDescription>
+              <CardDescription>
+                Manage evaluation prompts used for scoring conversations
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -483,7 +408,7 @@ const Evaluations = () => {
                     Manage Evaluation Prompts
                   </Button>
                 </div>
-                
+
                 <div className="grid gap-4">
                   {customEvalPrompts.map((evalPrompt) => (
                     <div key={evalPrompt.id} className="border rounded-lg p-4">
@@ -491,13 +416,18 @@ const Evaluations = () => {
                         <div className="flex-1">
                           <h4 className="font-medium">{evalPrompt.name}</h4>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Created: {new Date(evalPrompt.created_at).toLocaleDateString()}
+                            Created:{" "}
+                            {new Date(
+                              evalPrompt.created_at
+                            ).toLocaleDateString()}
                           </p>
                           <div className="mt-2">
-                            <p className="text-sm text-muted-foreground">Preview:</p>
+                            <p className="text-sm text-muted-foreground">
+                              Preview:
+                            </p>
                             <div className="bg-muted p-2 rounded text-sm font-mono max-h-20 overflow-y-auto">
                               {evalPrompt.prompt.substring(0, 200)}
-                              {evalPrompt.prompt.length > 200 && '...'}
+                              {evalPrompt.prompt.length > 200 && "..."}
                             </div>
                           </div>
                         </div>
@@ -508,7 +438,7 @@ const Evaluations = () => {
                             onClick={() => {
                               setSelectedCustomPrompt(evalPrompt.id);
                               setEvaluatorPrompt(evalPrompt.prompt);
-                              setActiveTab('single-turn-eval');
+                              setActiveTab("single-turn-eval");
                             }}
                           >
                             Use for Evaluation
@@ -517,12 +447,14 @@ const Evaluations = () => {
                       </div>
                     </div>
                   ))}
-                  
+
                   {customEvalPrompts.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>No custom evaluation prompts yet</p>
-                      <p className="text-sm">Create your first evaluation prompt to get started</p>
+                      <p className="text-sm">
+                        Create your first evaluation prompt to get started
+                      </p>
                     </div>
                   )}
                 </div>
@@ -535,7 +467,9 @@ const Evaluations = () => {
           <Card>
             <CardHeader>
               <CardTitle>Run Evaluation</CardTitle>
-              <CardDescription>Execute and monitor evaluation progress</CardDescription>
+              <CardDescription>
+                Execute and monitor evaluation progress
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {!isRunning && progress === 0 ? (
@@ -553,7 +487,9 @@ const Evaluations = () => {
                   </div>
 
                   {currentEntry && (
-                    <p className="text-sm text-muted-foreground">{currentEntry}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {currentEntry}
+                    </p>
                   )}
 
                   {error && (
@@ -565,7 +501,9 @@ const Evaluations = () => {
 
                   {!isRunning && progress === 100 && (
                     <Alert>
-                      <AlertDescription>Evaluation completed successfully!</AlertDescription>
+                      <AlertDescription>
+                        Evaluation completed successfully!
+                      </AlertDescription>
                     </Alert>
                   )}
                 </div>
@@ -578,7 +516,9 @@ const Evaluations = () => {
           <Card>
             <CardHeader>
               <CardTitle>Evaluation Results</CardTitle>
-              <CardDescription>View and analyze evaluation outcomes</CardDescription>
+              <CardDescription>
+                View and analyze evaluation outcomes
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {evalResults.length === 0 ? (
@@ -599,17 +539,35 @@ const Evaluations = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {evalResults.slice().reverse().map((result) => (
-                      <TableRow key={result.id}>
-                        <TableCell>{prompts.find(p => p.id === result.prompt_id)?.name || 'Unknown'}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{result.dataset_entry_id}</TableCell>
-                        <TableCell>{result.metrics.task_completion?.toFixed(1) || '-'}</TableCell>
-                        <TableCell>{result.metrics.tone?.toFixed(1) || '-'}</TableCell>
-                        <TableCell>{result.metrics.clarity?.toFixed(1) || '-'}</TableCell>
-                        <TableCell className="font-medium">{result.metrics.overall?.toFixed(1) || '-'}</TableCell>
-                        <TableCell>{new Date(result.timestamp).toLocaleDateString()}</TableCell>
-                      </TableRow>
-                    ))}
+                    {evalResults
+                      .slice()
+                      .reverse()
+                      .map((result) => (
+                        <TableRow key={result.id}>
+                          <TableCell>
+                            {prompts.find((p) => p.id === result.prompt_id)
+                              ?.name || "Unknown"}
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate">
+                            {result.dataset_entry_id}
+                          </TableCell>
+                          <TableCell>
+                            {result.metrics.task_completion?.toFixed(1) || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {result.metrics.tone?.toFixed(1) || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {result.metrics.clarity?.toFixed(1) || "-"}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {result.metrics.overall?.toFixed(1) || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(result.timestamp).toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               )}

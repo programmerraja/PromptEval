@@ -40,14 +40,7 @@ const AddToDatasetDialog = ({
   // Extraction prompt state
   const [extractionPrompt, setExtractionPrompt] = useState("");
   const [settings, setSettings] = useState<any>(null);
-  const [extractedData, setExtractedData] = useState<{
-    user_input: string;
-    assistant_response: string;
-    context: string;
-    topics: string[];
-    user_style: string;
-    expected_behavior: string;
-  } | null>(null);
+  const [extractedData, setExtractedData] = useState<string>("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [activeTab, setActiveTab] = useState<"extract" | "manual">("extract");
   
@@ -133,20 +126,11 @@ const AddToDatasetDialog = ({
         temperature: 0.1,
       });
 
-      try {
-        const extracted = JSON.parse(text);
-        setExtractedData(extracted);
-        
-        setEntryInput(extracted.user_input || "");
-        setEntryExpectedBehavior(extracted.expected_behavior || "");
-      } catch (parseError) {
-        console.error("Failed to parse extracted data:", parseError);
-        toast({
-          title: "Extraction Warning",
-          description: "Failed to parse extracted data, but extraction completed. Please review manually.",
-          variant: "destructive",
-        });
-      }
+      // Set the extracted text directly
+      setExtractedData(text);
+      
+      // Use the extracted text as the expected behavior
+      setEntryExpectedBehavior(text);
     } catch (error) {
       console.error("Extraction failed:", error);
       toast({
@@ -254,8 +238,8 @@ const AddToDatasetDialog = ({
         id: `entry_${Date.now()}`,
         type: promptType,
         title: entryTitle.trim(),
-        input: promptType === "single-turn" ? entryInput.trim() : (extractedData?.user_input || entryInput.trim()),
-        expected_behavior: promptType === "single-turn" ? entryExpectedBehavior.trim() : (extractedData?.expected_behavior || entryExpectedBehavior.trim()),
+        input: promptType === "single-turn" ? entryInput.trim() : undefined,
+        prompt: promptType === "multi-turn" ? entryInput.trim() :undefined,
         conversation: promptType === "multi-turn" ? messages : undefined,
         created_at: new Date().toISOString(),
       };
@@ -491,39 +475,20 @@ const AddToDatasetDialog = ({
                           </CardHeader>
                           <CardContent className="space-y-3">
                             <div>
-                              <Label className="text-xs font-medium">User Input</Label>
+                              <Label className="text-xs font-medium">Extracted Text</Label>
                               <Textarea
-                                value={extractedData.user_input || ""}
-                                onChange={(e) => setExtractedData({...extractedData, user_input: e.target.value})}
-                                className="min-h-[60px] text-sm"
+                                value={extractedData}
+                                onChange={(e) => {
+                                  setExtractedData(e.target.value);
+                                  setEntryExpectedBehavior(e.target.value);
+                                }}
+                                className="min-h-[120px] text-sm"
+                                placeholder="Extracted text will appear here..."
                               />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                You can edit the extracted text before adding to dataset.
+                              </p>
                             </div>
-                            <div>
-                              <Label className="text-xs font-medium">Expected Behavior</Label>
-                              <Textarea
-                                value={extractedData.expected_behavior || ""}
-                                onChange={(e) => setExtractedData({...extractedData, expected_behavior: e.target.value})}
-                                className="min-h-[60px] text-sm"
-                              />
-                            </div>
-                            {extractedData.context && (
-                              <div>
-                                <Label className="text-xs font-medium">Context</Label>
-                                <p className="text-sm text-muted-foreground">{extractedData.context}</p>
-                              </div>
-                            )}
-                            {extractedData.topics && extractedData.topics.length > 0 && (
-                              <div>
-                                <Label className="text-xs font-medium">Topics</Label>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {extractedData.topics.map((topic, index) => (
-                                    <Badge key={index} variant="secondary" className="text-xs">
-                                      {topic}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                           </CardContent>
                         </Card>
                       )}
@@ -532,24 +497,17 @@ const AddToDatasetDialog = ({
 
                   <TabsContent value="manual" className="space-y-4">
                     <div>
-                      <Label htmlFor="entry-input">User Input</Label>
-                      <Textarea
-                        id="entry-input"
-                        value={entryInput}
-                        onChange={(e) => setEntryInput(e.target.value)}
-                        placeholder="User input"
-                        className="min-h-[80px]"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="entry-expected">Expected Behavior</Label>
+                      <Label htmlFor="entry-expected">Prompt</Label>
                       <Textarea
                         id="entry-expected"
                         value={entryExpectedBehavior}
                         onChange={(e) => setEntryExpectedBehavior(e.target.value)}
-                        placeholder="Expected assistant response"
-                        className="min-h-[80px]"
+                        placeholder="Enter the prompt text..."
+                        className="min-h-[120px]"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Enter the prompt text that will be used for evaluation.
+                      </p>
                     </div>
                     <Card>
                       <CardHeader className="pb-3">

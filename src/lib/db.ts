@@ -24,13 +24,7 @@ export interface PromptVersion {
     model?: string;
   };
   created_at: string;
-  scores?: {
-    avg_score?: number;
-    accuracy?: number;
-    empathy?: number;
-    clarity?: number;
-    [key: string]: number | undefined;
-  };
+ 
 }
 
 export interface Dataset {
@@ -49,15 +43,8 @@ export interface DatasetEntry {
   id: string;
   type: 'single-turn' | 'multi-turn';
   title?: string;
+  prompt?: string;
   input?: string;
-  expected_behavior?: string;
-  system_context?: string;
-  user_behavior?: {
-    style?: string;
-    formality?: string;
-    goal?: string;
-    data?: Record<string, any>;
-  };
   conversation?: ConversationMessage[];
   created_at: string;
 }
@@ -147,6 +134,16 @@ export interface PlaygroundSession {
   saved_as_dataset: boolean;
 }
 
+export interface Playground {
+  id: string;
+  prompt_id: string;
+  prompt_version: string;
+  name: string;
+  messages: ConversationMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EvaluationPrompt {
   id: string;
   name: string;
@@ -194,6 +191,7 @@ export class PromptEvalDB extends Dexie {
   evaluations!: Table<Evaluation>;
   eval_results!: Table<EvalResult>;
   playground_sessions!: Table<PlaygroundSession>;
+  playgrounds!: Table<Playground>;
   evaluation_prompts!: Table<EvaluationPrompt>;
   extraction_prompts!: Table<ExtractionPrompt>;
   settings!: Table<Settings>;
@@ -215,6 +213,14 @@ export class PromptEvalDB extends Dexie {
       datasets: 'id, name, type, folder, created_at, *tags, extraction_prompt',
       evaluation_prompts: 'id, name, created_at',
       extraction_prompts: 'id, name, created_at'
+    });
+    
+    this.version(3).stores({
+      prompts: 'id, name, type, folder, created_at, updated_at',
+      datasets: 'id, name, type, folder, created_at, *tags, extraction_prompt',
+      evaluation_prompts: 'id, name, created_at',
+      extraction_prompts: 'id, name, created_at',
+      playgrounds: 'id, prompt_id, prompt_version, name, created_at, updated_at'
     });
   }
 }

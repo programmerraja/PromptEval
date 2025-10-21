@@ -97,7 +97,33 @@ const Playground = ({
 
   useEffect(() => {
     db.settings.get("default").then((s) => setSettings(s));
-  }, []);
+    loadPlaygroundConversations();
+  }, [prompt?.id]);
+
+  const loadPlaygroundConversations = async () => {
+    if (!prompt?.id) return;
+    
+    try {
+      const playgrounds = await db.playgrounds
+        .where('prompt_id')
+        .equals(prompt.id)
+        .toArray();
+      
+      const loadedConversations = playgrounds.map(playground => ({
+        id: playground.id,
+        name: playground.name,
+        messages: playground.messages,
+        isGenerating: false
+      }));
+      
+      setConversations(loadedConversations);
+      if (loadedConversations.length > 0) {
+        setActiveConversationId(loadedConversations[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to load playground conversations:', error);
+    }
+  };
 
   // Update processed prompts when original prompts change
   useEffect(() => {
@@ -150,6 +176,26 @@ const Playground = ({
       const conversation = conversations.find((c) => c.id === conversationId);
       if (!conversation) return;
 
+      // Save to playgrounds table
+      const playground = {
+        id: conversationId,
+        prompt_id: prompt?.id || 'playground',
+        prompt_version: Object.keys(prompt?.versions || {})[0] || 'v1',
+        name: conversation.name,
+        messages: messages,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Check if playground already exists in database
+      const existingPlayground = await db.playgrounds.get(conversationId);
+      if (existingPlayground) {
+        await db.playgrounds.update(conversationId, playground);
+      } else {
+        await db.playgrounds.add(playground);
+      }
+
+      // Also save to conversations table for backward compatibility
       const dbConversation = {
         id: conversationId,
         prompt_id: prompt?.id || 'playground',
@@ -165,7 +211,6 @@ const Playground = ({
         }
       };
 
-      // Check if conversation already exists in database
       const existingConversation = await db.conversations.get(conversationId);
       if (existingConversation) {
         await db.conversations.update(conversationId, dbConversation);

@@ -69,12 +69,7 @@ export const DatasetEntryDialog = ({ open, onOpenChange, entry, datasetType, onS
       onSave({
         ...baseEntry,
         type: "multi-turn",
-        system_context: systemContext || undefined,
-        user_behavior: {
-          style: userStyle || undefined,
-          formality: userFormality,
-          goal: userGoal || undefined,
-        },
+        prompt:input,
         conversation: conversation.filter(msg => msg.content.trim()),
       });
     }
@@ -118,10 +113,9 @@ export const DatasetEntryDialog = ({ open, onOpenChange, entry, datasetType, onS
             />
           </div>
 
-          {type === "single-turn" ? (
             <>
               <div>
-                <Label htmlFor="input">Input *</Label>
+                <Label htmlFor="input">{type === "single-turn" ? "Input *": "Prompt *"} </Label>
                 <Textarea
                   id="input"
                   value={input}
@@ -141,105 +135,7 @@ export const DatasetEntryDialog = ({ open, onOpenChange, entry, datasetType, onS
                 />
               </div>
             </>
-          ) : (
-            <Tabs defaultValue="conversation" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="conversation">Conversation</TabsTrigger>
-                <TabsTrigger value="context">Context & Behavior</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="conversation" className="space-y-4">
-                <div className="space-y-2">
-                  {conversation.map((msg, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <div className="flex-1 space-y-2">
-                        <Label>{msg.role === "user" ? "User" : "Assistant"}</Label>
-                        <Textarea
-                          value={msg.content}
-                          onChange={(e) => updateMessage(idx, e.target.value)}
-                          placeholder={`${msg.role} message...`}
-                          rows={2}
-                        />
-                      </div>
-                      {conversation.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteMessage(idx)}
-                          className="mt-7"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <Button onClick={addMessage} variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Message
-                </Button>
-              </TabsContent>
-              
-              <TabsContent value="context" className="space-y-4">
-                <div>
-                  <Label htmlFor="system-context">System Context</Label>
-                  <Textarea
-                    id="system-context"
-                    value={systemContext}
-                    onChange={(e) => setSystemContext(e.target.value)}
-                    placeholder="e.g., The assistant is a helpful tech support agent..."
-                    rows={3}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="user-style">User Communication Style</Label>
-                  <Input
-                    id="user-style"
-                    value={userStyle}
-                    onChange={(e) => setUserStyle(e.target.value)}
-                    placeholder="e.g., Conversational, frustrated but polite"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="formality">Formality Level</Label>
-                  <Select value={userFormality} onValueChange={setUserFormality}>
-                    <SelectTrigger id="formality">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="formal">Formal</SelectItem>
-                      <SelectItem value="semi-formal">Semi-formal</SelectItem>
-                      <SelectItem value="informal">Informal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="user-goal">User Goal</Label>
-                  <Textarea
-                    id="user-goal"
-                    value={userGoal}
-                    onChange={(e) => setUserGoal(e.target.value)}
-                    placeholder="What is the user trying to achieve?"
-                    rows={3}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="expected-behavior">Expected Behavior</Label>
-                  <Textarea
-                    id="expected-behavior"
-                    value={expectedBehavior}
-                    onChange={(e) => setExpectedBehavior(e.target.value)}
-                    placeholder="How should the assistant respond?"
-                    rows={3}
-                  />
-                </div>
-              </TabsContent>
-            </Tabs>
-          )}
+          
         </div>
 
         <DialogFooter>
