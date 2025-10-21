@@ -115,8 +115,8 @@ export interface EvalResult {
   prompt_id: string;
   dataset_entry_id: string;
   eval_type: 'single-turn' | 'multi-turn';
-  metrics: Record<string, number>;
-  reason: string;
+  metrics: Record<string, any>;
+  reason?:string;
   timestamp: string;
   cost?: {
     eval_tokens: number;
@@ -152,6 +152,7 @@ export interface EvaluationPrompt {
   name: string;
   prompt: string;
   created_at: string;
+  schema:Record<string, any>;
 }
 
 export interface ExtractionPrompt {

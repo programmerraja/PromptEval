@@ -32,7 +32,6 @@ const VariableEditor = ({
 }: VariableEditorProps) => {
   const [variables, setVariables] = useState<Variable[]>([]);
   const [previewText, setPreviewText] = useState(promptText);
-  const [previewSystemPrompt, setPreviewSystemPrompt] = useState(systemPrompt);
   const { toast } = useToast();
 
   // Extract variables from prompt text
@@ -82,10 +81,10 @@ const VariableEditor = ({
     onVariablesChange(newVariablesRecord);
   };
 
-  const handleAddVariable = () => {
-    const newVariables = [...variables, { key: "", value: "" }];
-    setVariables(newVariables);
-  };
+  // const handleAddVariable = () => {
+  //   const newVariables = [...variables, { key: "", value: "" }];
+  //   setVariables(newVariables);
+  // };
 
   const handleRemoveVariable = (index: number) => {
     const newVariables = variables.filter((_, i) => i !== index);
@@ -103,7 +102,6 @@ const VariableEditor = ({
 
   const handleApplyVariables = () => {
     onPromptChange(previewText);
-    onSystemPromptChange(previewSystemPrompt);
     toast({
       title: "Applied",
       description: "Variables have been applied to prompts",
@@ -131,7 +129,7 @@ const VariableEditor = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
-          <Label className="text-sm font-medium">Variables</Label>
+          {/* <Label className="text-sm font-medium">Variables</Label> */}
           <div className="space-y-3 max-h-40 overflow-y-auto">
             {variables.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-6">
@@ -166,7 +164,7 @@ const VariableEditor = ({
               ))
             )}
           </div>
-          <Button
+          {/* <Button
             size="sm"
             variant="outline"
             onClick={handleAddVariable}
@@ -174,7 +172,7 @@ const VariableEditor = ({
           >
             <Plus className="h-3 w-3 mr-2" />
             Add Variable
-          </Button>
+          </Button> */}
         </div>
 
         <div className="space-y-3">

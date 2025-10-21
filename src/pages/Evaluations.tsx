@@ -15,9 +15,10 @@ import { toast } from "@/hooks/use-toast";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import EvaluationPromptManager from "@/components/EvaluationPromptManager";
+import ModelConfig from "@/components/ModelConfig";
 
 const Evaluations = () => {
-  const [activeTab, setActiveTab] = useState("config");
+  const [activeTab, setActiveTab] = useState("single-turn-eval");
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [evalResults, setEvalResults] = useState<EvalResult[]>([]);
@@ -287,16 +288,18 @@ const Evaluations = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
-          <TabsTrigger value="config">Config</TabsTrigger>
+          <TabsTrigger value="single-turn-eval">Single Turn Eval</TabsTrigger>
+          <TabsTrigger value="model-config">Model Config</TabsTrigger>
+          <TabsTrigger value="prompt-management">Prompt Management</TabsTrigger>
           <TabsTrigger value="run">Run</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="config" className="space-y-4">
+        <TabsContent value="single-turn-eval" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Evaluation Configuration</CardTitle>
-              <CardDescription>Set up your evaluation parameters</CardDescription>
+              <CardTitle>Single Turn Evaluation</CardTitle>
+              <CardDescription>Configure and run single-turn prompt evaluations</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -307,7 +310,7 @@ const Evaluations = () => {
                       <SelectValue placeholder="Select dataset" />
                     </SelectTrigger>
                     <SelectContent>
-                      {datasets.map(d => (
+                      {datasets.filter(d => d.type === 'single-turn').map(d => (
                         <SelectItem key={d.id} value={d.id}>
                           {d.name} ({d.entries.length} entries)
                         </SelectItem>
@@ -330,7 +333,7 @@ const Evaluations = () => {
                       <SelectValue placeholder="Select prompt" />
                     </SelectTrigger>
                     <SelectContent>
-                      {prompts.map(p => (
+                      {prompts.filter(p => p.type === 'single-turn').map(p => (
                         <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -351,26 +354,6 @@ const Evaluations = () => {
                       }
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Model</Label>
-                  <Input value={model} onChange={(e) => setModel(e.target.value)} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Temperature</Label>
-                  <Input type="number" step="0.1" value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Max Tokens</Label>
-                  <Input type="number" value={maxTokens} onChange={(e) => setMaxTokens(parseInt(e.target.value))} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Top P</Label>
-                  <Input type="number" step="0.1" value={topP} onChange={(e) => setTopP(parseFloat(e.target.value))} />
                 </div>
               </div>
 
@@ -464,6 +447,84 @@ const Evaluations = () => {
                     className="font-mono text-sm"
                     placeholder="Enter evaluation prompt or select a custom prompt above..."
                   />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="model-config" className="space-y-4">
+          <ModelConfig
+            model={model}
+            temperature={temperature}
+            maxTokens={maxTokens}
+            topP={topP}
+            onModelChange={setModel}
+            onTemperatureChange={setTemperature}
+            onMaxTokensChange={setMaxTokens}
+            onTopPChange={setTopP}
+            title="Model Configuration"
+            description="Configure model parameters for evaluation"
+          />
+        </TabsContent>
+
+        <TabsContent value="prompt-management" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Evaluation Prompt Management</CardTitle>
+              <CardDescription>Manage evaluation prompts used for scoring conversations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Evaluation Prompts</h3>
+                  <Button onClick={() => setShowPromptManager(true)}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Manage Evaluation Prompts
+                  </Button>
+                </div>
+                
+                <div className="grid gap-4">
+                  {customEvalPrompts.map((evalPrompt) => (
+                    <div key={evalPrompt.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{evalPrompt.name}</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Created: {new Date(evalPrompt.created_at).toLocaleDateString()}
+                          </p>
+                          <div className="mt-2">
+                            <p className="text-sm text-muted-foreground">Preview:</p>
+                            <div className="bg-muted p-2 rounded text-sm font-mono max-h-20 overflow-y-auto">
+                              {evalPrompt.prompt.substring(0, 200)}
+                              {evalPrompt.prompt.length > 200 && '...'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCustomPrompt(evalPrompt.id);
+                              setEvaluatorPrompt(evalPrompt.prompt);
+                              setActiveTab('single-turn-eval');
+                            }}
+                          >
+                            Use for Evaluation
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {customEvalPrompts.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No custom evaluation prompts yet</p>
+                      <p className="text-sm">Create your first evaluation prompt to get started</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>

@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Database, MessageSquare, FileText, Wand2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dataset, DatasetEntry, ConversationMessage, db } from "@/lib/db";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { generateText } from "ai";
 
 interface AddToDatasetDialogProps {
   isOpen: boolean;
@@ -51,7 +53,6 @@ const AddToDatasetDialog = ({
   
   const { toast } = useToast();
 
-  // Load datasets on mount
   useEffect(() => {
     if (isOpen) {
       loadDatasets();
@@ -121,26 +122,21 @@ const AddToDatasetDialog = ({
         .map(msg => `${msg.role}: ${msg.content}`)
         .join('\n\n');
 
-      // Use the AI SDK to call the extraction
-      const { generateText } = await import('ai');
-      const { openai } = await import('@ai-sdk/openai');
       
-      const client = openai({
-        apiKey: settings.api_keys?.openai || process.env.OPENAI_API_KEY,
+      const client = createGoogleGenerativeAI({
+        apiKey: settings.api_keys?.google || process.env.GOOGLE_API_KEY,
       });
 
       const { text } = await generateText({
-        model: client('gpt-4o-mini'),
+        model: client('gemini-2.5-flash'),
         prompt: `${extractionPrompt}\n\nConversation:\n${conversationText}`,
         temperature: 0.1,
       });
 
-      // Parse the extracted data
       try {
         const extracted = JSON.parse(text);
         setExtractedData(extracted);
         
-        // Auto-populate the form fields
         setEntryInput(extracted.user_input || "");
         setEntryExpectedBehavior(extracted.expected_behavior || "");
       } catch (parseError) {

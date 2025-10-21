@@ -1,19 +1,26 @@
 import { useState, useEffect } from "react";
-import { db, Prompt, PromptVersion, type Settings } from "@/lib/db";
+import { db, Prompt, PromptVersion, type Settings, Dataset, EvalResult, Conversation } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Save, Copy, Trash2, MoreVertical, X } from "lucide-react";
+import { Plus, Save, Copy, Trash2, MoreVertical, X, Play, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Playground from "@/components/Playground";
 import VariableEditor from "@/components/VariableEditor";
+import ModelConfig from "@/components/ModelConfig";
+import { generateText } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
 
 const Prompts = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -32,6 +39,7 @@ const Prompts = () => {
   });
   
   const [settings, setSettings] = useState<Settings | null>(null);
+  
   const [extractionPrompt, setExtractionPrompt] = useState("");
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -41,12 +49,34 @@ const Prompts = () => {
   const [showVersionDeleteDialog, setShowVersionDeleteDialog] = useState(false);
   
   const [versionToDelete, setVersionToDelete] = useState<{ promptId: string; versionId: string } | null>(null);
+  
+  // Evaluation state
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [evalResults, setEvalResults] = useState<EvalResult[]>([]);
+  const [selectedEvalDataset, setSelectedEvalDataset] = useState<string>("");
+  const [selectedEvalVersion, setSelectedEvalVersion] = useState<string>("");
+  const [isRunningEval, setIsRunningEval] = useState(false);
+  const [evalProgress, setEvalProgress] = useState(0);
+  const [currentEvalEntry, setCurrentEvalEntry] = useState("");
+  const [evalError, setEvalError] = useState("");
+  const [evaluatorPrompt, setEvaluatorPrompt] = useState("");
+  const [provider, setProvider] = useState<"openai" | "anthropic" | "google">("openai");
+  
   const { toast } = useToast();
 
   useEffect(() => {
     loadPrompts();
     loadSettings();
+    loadDatasets();
+    loadEvalResults();
   }, []);
+
+  useEffect(() => {
+    if (selectedPrompt) {
+      setSelectedEvalVersion(Object.keys(selectedPrompt.versions)[0] || "v1");
+      loadEvalResultsForPrompt(selectedPrompt.id);
+    }
+  }, [selectedPrompt]);
 
   const loadPrompts = async () => {
     const allPrompts = await db.prompts.toArray();
@@ -60,35 +90,27 @@ const Prompts = () => {
       if (settingsData?.global_extraction_prompt) {
         setExtractionPrompt(settingsData.global_extraction_prompt);
       }
+      if (settingsData?.default_evaluation_prompt) {
+        setEvaluatorPrompt(settingsData.default_evaluation_prompt);
+      }
     } catch (error) {
       console.error("Failed to load settings:", error);
     }
   };
 
-  const saveExtractionPrompt = async () => {
-    if (!settings) return;
-    
-    try {
-      const updatedSettings = {
-        ...settings,
-        global_extraction_prompt: extractionPrompt
-      };
-      
-      await db.settings.put(updatedSettings);
-      setSettings(updatedSettings);
-      
-      toast({
-        title: "Success",
-        description: "Extraction prompt saved successfully",
-      });
-    } catch (error) {
-      console.error("Failed to save extraction prompt:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save extraction prompt",
-        variant: "destructive",
-      });
-    }
+  const loadDatasets = async () => {
+    const datasetsData = await db.datasets.toArray();
+    setDatasets(datasetsData);
+  };
+
+  const loadEvalResults = async () => {
+    const resultsData = await db.eval_results.toArray();
+    setEvalResults(resultsData);
+  };
+
+  const loadEvalResultsForPrompt = async (promptId: string) => {
+    const resultsData = await db.eval_results.where("prompt_id").equals(promptId).toArray();
+    setEvalResults(resultsData);
   };
 
   const createNewPrompt = async () => {
@@ -313,6 +335,226 @@ const Prompts = () => {
     });
   };
 
+  const runEvaluation = async () => {
+    if (!selectedPrompt || !selectedEvalDataset || !selectedEvalVersion) {
+      toast({
+        title: "Configuration incomplete",
+        description: "Please select dataset and version.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const settings = await db.settings.get('default');
+    let apiKey: string | undefined;
+    
+    switch (provider) {
+      case 'openai':
+        apiKey = settings?.api_keys?.openai;
+        break;
+      case 'anthropic':
+        apiKey = settings?.api_keys?.anthropic;
+        break;
+      case 'google':
+        apiKey = settings?.api_keys?.google;
+        break;
+    }
+
+    if (!apiKey) {
+      toast({
+        title: "API Key required",
+        description: `Please add your ${provider.charAt(0).toUpperCase() + provider.slice(1)} API key in Settings.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const dataset = datasets.find(d => d.id === selectedEvalDataset);
+    const promptVersion = selectedPrompt.versions[selectedEvalVersion];
+    
+    if (!dataset || !promptVersion) return;
+
+    setIsRunningEval(true);
+    setEvalProgress(0);
+    setEvalError("");
+
+    let modelClient: any;
+    
+    switch (provider) {
+      case 'openai':
+        modelClient = createOpenAI({ apiKey });
+        break;
+      case 'anthropic':
+        // For now, we'll use OpenAI client for Anthropic models
+        // In a real implementation, you'd use the Anthropic SDK
+        modelClient = createOpenAI({ apiKey });
+        break;
+      case 'google':
+        // For now, we'll use OpenAI client for Google models
+        // In a real implementation, you'd use the Google AI SDK
+        modelClient = createOpenAI({ apiKey });
+        break;
+      default:
+        modelClient = createOpenAI({ apiKey });
+    }
+    
+    const entries = dataset.entries;
+    const totalEntries = entries.length;
+
+    try {
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        setCurrentEvalEntry(`Processing entry ${i + 1}/${totalEntries}: ${entry.title || entry.input?.substring(0, 50) || 'Untitled'}`);
+
+        // Step 1: Generate conversation
+        let conversation: Conversation;
+        
+        if (entry.type === 'single-turn') {
+          // Single-turn: generate one response
+          const { text } = await generateText({
+            model: modelClient(promptVersion.config.model),
+            messages: [
+              { role: 'system', content: promptVersion.config.system_prompt },
+              { role: 'user', content: entry.input || '' }
+            ],
+            temperature: promptVersion.config.temperature,
+            topP: promptVersion.config.top_p
+          });
+
+          conversation = {
+            id: `conv_${Date.now()}_${i}`,
+            prompt_id: selectedPrompt.id,
+            prompt_version: selectedEvalVersion,
+            model: promptVersion.config.model,
+            type: 'auto_eval',
+            messages: [
+              { role: 'user', content: entry.input || '' },
+              { role: 'assistant', content: text }
+            ],
+            metadata: {
+              dataset_ref: entry.id,
+              date: new Date().toISOString(),
+              status: 'completed',
+              turn_count: 1
+            }
+          };
+        } else {
+          // Multi-turn: simulate conversation
+          const messages: any[] = [
+            { role: 'system', content: promptVersion.config.system_prompt }
+          ];
+
+          if (entry.conversation && entry.conversation.length > 0) {
+            // Use first user message from dataset
+            messages.push({ role: 'user', content: entry.conversation[0].content });
+          }
+
+          const { text } = await generateText({
+            model: modelClient(promptVersion.config.model),
+            messages,
+            temperature: promptVersion.config.temperature,
+            topP: promptVersion.config.top_p
+          });
+
+          conversation = {
+            id: `conv_${Date.now()}_${i}`,
+            prompt_id: selectedPrompt.id,
+            prompt_version: selectedEvalVersion,
+            model: promptVersion.config.model,
+            type: 'auto_eval',
+            messages: [
+              { role: 'user', content: entry.conversation?.[0]?.content || '' },
+              { role: 'assistant', content: text }
+            ],
+            metadata: {
+              dataset_ref: entry.id,
+              date: new Date().toISOString(),
+              status: 'completed',
+              turn_count: entry.conversation?.length || 1,
+              simulated_user: true
+            }
+          };
+        }
+
+        // Save conversation
+        await db.conversations.add(conversation);
+
+        // Step 2: Evaluate the conversation
+        const conversationText = conversation.messages
+          .map(m => `${m.role}: ${m.content}`)
+          .join('\n\n');
+
+        const evalPromptText = evaluatorPrompt
+          .replace('{conversation}', conversationText)
+          .replace('{expected_outcome}', entry.expected_behavior || entry.user_behavior?.goal || 'Complete the task successfully');
+
+        const { text: evalText } = await generateText({
+          model: modelClient(promptVersion.config.model),
+          prompt: evalPromptText,
+          temperature: 0.3
+        });
+
+        // Parse evaluation result
+        let metrics: Record<string, number> = {};
+        let reason = evalText;
+
+        try {
+          const jsonMatch = evalText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            metrics = {
+              task_completion: parsed.task_completion || parsed.task_success || 0,
+              tone: parsed.tone || parsed.empathy || 0,
+              clarity: parsed.clarity || parsed.relevance || 0,
+              overall: parsed.overall || 0
+            };
+            reason = parsed.reason || evalText;
+          }
+        } catch (e) {
+          console.error('Failed to parse eval result:', e);
+        }
+
+        // Save evaluation result
+        const evalResult: EvalResult = {
+          id: `eval_${Date.now()}_${i}`,
+          conversation_id: conversation.id,
+          prompt_id: selectedPrompt.id,
+          dataset_entry_id: entry.id,
+          eval_type: entry.type,
+          metrics,
+          reason,
+          timestamp: new Date().toISOString(),
+          cost: {
+            eval_tokens: 100,
+            cost_estimate: 0.001
+          }
+        };
+
+        await db.eval_results.add(evalResult);
+
+        setEvalProgress(((i + 1) / totalEntries) * 100);
+      }
+
+      await loadEvalResultsForPrompt(selectedPrompt.id);
+      
+      toast({
+        title: "Evaluation complete",
+        description: `Evaluated ${totalEntries} entries successfully.`
+      });
+    } catch (err: any) {
+      setEvalError(err.message || 'Evaluation failed');
+      toast({
+        title: "Evaluation failed",
+        description: err.message || 'An error occurred',
+        variant: "destructive"
+      });
+    } finally {
+      setIsRunningEval(false);
+      setEvalProgress(0);
+      setCurrentEvalEntry("");
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full">
       <div className="w-64 border-r border-border">
@@ -381,7 +623,7 @@ const Prompts = () => {
               <TabsList>
                 <TabsTrigger value="editor">Editor</TabsTrigger>
                 <TabsTrigger value="playground">Playground</TabsTrigger>
-                <TabsTrigger value="auto-chat">Auto Chat</TabsTrigger>
+                <TabsTrigger value="eval">Eval</TabsTrigger>
                 <TabsTrigger value="results">Eval Results</TabsTrigger>
               </TabsList>
             </div>
@@ -508,53 +750,21 @@ const Prompts = () => {
                   />
                 </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Configuration</CardTitle>
-                    <CardDescription>Model parameters for this prompt</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Model</Label>
-                        <Input
-                          value={editingPrompt.model}
-                          onChange={(e) => setEditingPrompt({ ...editingPrompt, model: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Temperature: {editingPrompt.temperature}</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="2"
-                          step="0.1"
-                          value={editingPrompt.temperature}
-                          onChange={(e) => setEditingPrompt({ ...editingPrompt, temperature: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Max Tokens: {editingPrompt.max_tokens}</Label>
-                        <Input
-                          type="number"
-                          value={editingPrompt.max_tokens}
-                          onChange={(e) => setEditingPrompt({ ...editingPrompt, max_tokens: parseInt(e.target.value) })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Top P: {editingPrompt.top_p}</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="1"
-                          step="0.1"
-                          value={editingPrompt.top_p}
-                          onChange={(e) => setEditingPrompt({ ...editingPrompt, top_p: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <ModelConfig
+                  model={editingPrompt.model}
+                  temperature={editingPrompt.temperature}
+                  maxTokens={editingPrompt.max_tokens}
+                  topP={editingPrompt.top_p}
+                  onModelChange={(model) => setEditingPrompt({ ...editingPrompt, model })}
+                  onTemperatureChange={(temperature) => setEditingPrompt({ ...editingPrompt, temperature })}
+                  onMaxTokensChange={(max_tokens) => setEditingPrompt({ ...editingPrompt, max_tokens })}
+                  onTopPChange={(top_p) => setEditingPrompt({ ...editingPrompt, top_p })}
+                  showProvider={true}
+                  provider={provider}
+                  onProviderChange={setProvider}
+                  title="Model Configuration"
+                  description="Model parameters for this prompt"
+                />
 
                 <VariableEditor
                   promptText={editingPrompt.text}
@@ -633,16 +843,101 @@ const Prompts = () => {
               />
             </TabsContent>
 
-            <TabsContent value="auto-chat" className="p-6">
+            <TabsContent value="eval" className="p-6 space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Auto Chat (LLM-vs-LLM)</CardTitle>
-                  <CardDescription>Simulate conversations between two models</CardDescription>
+                  <CardTitle>Evaluation</CardTitle>
+                  <CardDescription>Run evaluations on this prompt using selected datasets</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12 text-muted-foreground">
-                    Coming soon - Automated conversation testing
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Dataset</Label>
+                      <Select value={selectedEvalDataset} onValueChange={setSelectedEvalDataset}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select dataset" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {datasets.filter(d => d.type === selectedPrompt?.type).map(d => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.name} ({d.entries.length} entries)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Prompt Version</Label>
+                      <Select value={selectedEvalVersion} onValueChange={setSelectedEvalVersion}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select version" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedPrompt && Object.keys(selectedPrompt.versions).map(v => (
+                            <SelectItem key={v} value={v}>{v}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Provider</Label>
+                      <Select value={provider} onValueChange={(value) => setProvider(value as "openai" | "anthropic" | "google")}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="openai">OpenAI</SelectItem>
+                          <SelectItem value="anthropic">Anthropic</SelectItem>
+                          <SelectItem value="google">Google</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
+                  <div className="space-y-4 border-t pt-4">
+                    <div className="space-y-2">
+                      <Label>Evaluation Prompt</Label>
+                      <Textarea 
+                        value={evaluatorPrompt}
+                        onChange={(e) => setEvaluatorPrompt(e.target.value)}
+                        rows={6}
+                        className="font-mono text-sm"
+                        placeholder="Enter evaluation prompt..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button onClick={runEvaluation} disabled={isRunningEval || !selectedEvalDataset || !selectedEvalVersion}>
+                      <Play className="h-4 w-4 mr-2" />
+                      {isRunningEval ? 'Running...' : 'Run Evaluation'}
+                    </Button>
+                  </div>
+
+                  {isRunningEval && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Progress</span>
+                          <span>{Math.round(evalProgress)}%</span>
+                        </div>
+                        <Progress value={evalProgress} />
+                      </div>
+
+                      {currentEvalEntry && (
+                        <p className="text-sm text-muted-foreground">{currentEvalEntry}</p>
+                      )}
+
+                      {evalError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{evalError}</AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -655,9 +950,36 @@ const Prompts = () => {
                   <CardDescription>Past evaluation scores for this prompt</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-12 text-muted-foreground">
-                    No evaluations yet
-                  </div>
+                  {evalResults.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      No evaluations yet
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Dataset Entry</TableHead>
+                          <TableHead>Task</TableHead>
+                          <TableHead>Tone</TableHead>
+                          <TableHead>Clarity</TableHead>
+                          <TableHead>Overall</TableHead>
+                          <TableHead>Date</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {evalResults.slice().reverse().map((result) => (
+                          <TableRow key={result.id}>
+                            <TableCell className="max-w-[200px] truncate">{result.dataset_entry_id}</TableCell>
+                            <TableCell>{result.metrics.task_completion?.toFixed(1) || '-'}</TableCell>
+                            <TableCell>{result.metrics.tone?.toFixed(1) || '-'}</TableCell>
+                            <TableCell>{result.metrics.clarity?.toFixed(1) || '-'}</TableCell>
+                            <TableCell className="font-medium">{result.metrics.overall?.toFixed(1) || '-'}</TableCell>
+                            <TableCell>{new Date(result.timestamp).toLocaleDateString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

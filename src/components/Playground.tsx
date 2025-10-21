@@ -9,7 +9,7 @@ import { Play, Save, RotateCcw, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConversationMessage, db, Prompt } from "@/lib/db";
 import PlaygroundChat from "./PlaygroundChat";
-import ModelSelector from "./ModelSelector";
+import ModelConfig from "./ModelConfig";
 import ResizablePanel from "./ResizablePanel";
 import ConversationTabs from "./ConversationTabs";
 import ABTestingPanel from "./ABTestingPanel";
@@ -78,7 +78,9 @@ const Playground = ({
   const [abTestGenerating, setAbTestGenerating] = useState<
     Record<string, boolean>
   >({});
+  
   const [processedPromptText, setProcessedPromptText] = useState(promptText);
+  
   const [processedSystemPrompt, setProcessedSystemPrompt] =
     useState(systemPrompt);
   const [editableSystemPrompt, setEditableSystemPrompt] =
@@ -141,6 +143,39 @@ const Playground = ({
       };
       return newStats;
     });
+  };
+
+  const saveConversationToDatabase = async (conversationId: string, messages: ConversationMessage[]) => {
+    try {
+      const conversation = conversations.find((c) => c.id === conversationId);
+      if (!conversation) return;
+
+      const dbConversation = {
+        id: conversationId,
+        prompt_id: prompt?.id || 'playground',
+        prompt_version: 'v1',
+        model: config.model,
+        type: 'manual' as const,
+        messages: messages,
+        metadata: {
+          context: 'playground',
+          status: 'completed',
+          date: new Date().toISOString(),
+          turn_count: messages.filter(m => m.role === 'user').length
+        }
+      };
+
+      // Check if conversation already exists in database
+      const existingConversation = await db.conversations.get(conversationId);
+      if (existingConversation) {
+        await db.conversations.update(conversationId, dbConversation);
+      } else {
+        await db.conversations.add(dbConversation);
+      }
+    } catch (error) {
+      console.error('Failed to save conversation to database:', error);
+      // Don't show error to user as this is background operation
+    }
   };
 
   const generateMessage = async (
@@ -221,6 +256,9 @@ const Playground = ({
             : c
         )
       );
+
+      // Auto-save conversation to database
+      await saveConversationToDatabase(conversationId, [...conversation.messages, userMessage, assistantMessage]);
     } catch (error) {
       toast({
         title: "Error",
@@ -274,18 +312,23 @@ const Playground = ({
         content: response,
       };
 
+      const updatedMessages = [...messagesUpToUser, assistantMessage];
+
       // Update conversation with new assistant message
       setConversations((prev) =>
         prev.map((c) =>
           c.id === conversationId
             ? {
                 ...c,
-                messages: [...c.messages, assistantMessage],
+                messages: updatedMessages,
                 isGenerating: false,
               }
             : c
         )
       );
+
+      // Auto-save conversation to database
+      await saveConversationToDatabase(conversationId, updatedMessages);
     } catch (error) {
       toast({
         title: "Error",
@@ -319,6 +362,9 @@ const Playground = ({
 
     setConversations((prev) => [...prev, newConversation]);
     setActiveConversationId(newConversation.id);
+    
+    // Auto-save empty conversation to database
+    saveConversationToDatabase(newConversation.id, []);
   };
 
   const handleCloseConversation = (conversationId: string) => {
@@ -572,7 +618,10 @@ const Playground = ({
               <Label>System Prompt</Label>
               <Textarea
                 value={editableSystemPrompt}
-                onChange={(e) => setEditableSystemPrompt(e.target.value)}
+                onChange={(e) => {
+                  setEditableSystemPrompt(e.target.value);
+                  setProcessedSystemPrompt(e.target.value);
+                }}
                 className="min-h-[100px] text-sm"
                 placeholder="Enter system prompt..."
               />
@@ -599,7 +648,21 @@ const Playground = ({
           </TabsContent>
 
           <TabsContent value="model" className="flex-1 p-4 overflow-y-auto">
-            <ModelSelector config={config} onConfigChange={setConfig} />
+            <ModelConfig
+              model={config.model}
+              temperature={config.temperature}
+              maxTokens={config.maxTokens}
+              topP={config.topP || 0.9}
+              onModelChange={(model) => setConfig({ ...config, model })}
+              onTemperatureChange={(temperature) => setConfig({ ...config, temperature })}
+              onMaxTokensChange={(maxTokens) => setConfig({ ...config, maxTokens })}
+              onTopPChange={(topP) => setConfig({ ...config, topP })}
+              showProvider={true}
+              provider={config.provider}
+              onProviderChange={(provider) => setConfig({ ...config, provider })}
+              title="Model Configuration"
+              description="Configure the AI model and parameters"
+            />
           </TabsContent>
 
           <TabsContent value="stats" className="flex-1 p-4 overflow-y-auto">
