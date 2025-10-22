@@ -238,8 +238,8 @@ const AddToDatasetDialog = ({
         id: `entry_${Date.now()}`,
         type: promptType,
         title: entryTitle.trim(),
-        input: promptType === "single-turn" ? entryInput.trim() : undefined,
-        prompt: promptType === "multi-turn" ? entryInput.trim() :undefined,
+        input: promptType === "single-turn" ? entryInput.trim() || extractedData.trim() : undefined,
+        prompt: promptType === "multi-turn" ? entryInput.trim() || extractedData.trim() :undefined,
         conversation: promptType === "multi-turn" ? messages : undefined,
         created_at: new Date().toISOString(),
       };

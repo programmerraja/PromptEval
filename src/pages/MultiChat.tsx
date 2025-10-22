@@ -91,7 +91,7 @@ const MultiChat = () => {
     provider: "google",
     model: "gemini-2.5-flash",
     temperature: 0.7,
-    maxTokens: 500,
+    maxTokens: 4096,
     topP: 0.9,
   });
 
@@ -99,7 +99,7 @@ const MultiChat = () => {
     provider: "google",
     model: "gemini-2.5-flash",
     temperature: 0.7,
-    maxTokens: 500,
+    maxTokens: 4096,
     topP: 0.9,
   });
 
@@ -207,8 +207,8 @@ const MultiChat = () => {
       model: client(config.model),
       messages,
       temperature: config.temperature,
-      maxOutputTokens: config.maxTokens,
-      topP: config.topP,
+      // maxOutputTokens: config.maxTokens,
+      // topP: config.topP,
     });
 
     return result.text;

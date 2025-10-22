@@ -248,7 +248,7 @@ const Playground = ({
         ...conversationHistory,
       ],
       temperature: config.temperature,
-      maxOutputTokens: config.maxTokens,
+      // maxOutputTokens: config.maxTokens,
       topP: config.topP,
     });
 
@@ -567,7 +567,7 @@ const Playground = ({
         ...conversationHistory,
       ],
       temperature: config.temperature,
-      maxOutputTokens: config.maxTokens,
+      // maxOutputTokens: config.maxTokens,
       topP: config.topP,
     });
 

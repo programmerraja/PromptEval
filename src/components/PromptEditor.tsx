@@ -221,7 +221,7 @@ const PromptEditor = ({
             value={editingPrompt.system_prompt}
             onChange={(e) => setEditingPrompt({ ...editingPrompt, system_prompt: e.target.value })}
             placeholder="You are a helpful assistant..."
-            className="min-h-[100px]"
+            className="min-h-[500px]"
           />
         </div>
 
@@ -231,7 +231,7 @@ const PromptEditor = ({
             value={editingPrompt.text}
             onChange={(e) => setEditingPrompt({ ...editingPrompt, text: e.target.value })}
             placeholder="Enter your prompt here..."
-            className="min-h-[200px]"
+            className="min-h-[100px]"
           />
         </div>
 
