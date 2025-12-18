@@ -75,7 +75,7 @@ const Datasets = () => {
     await db.datasets.update(selectedDataset.id, updated);
     setSelectedDataset(updated);
     await loadDatasets();
-    
+
     setEditingEntry(undefined);
     toast({
       title: editingEntry ? "Entry updated" : "Entry added",
@@ -92,7 +92,7 @@ const Datasets = () => {
     setSelectedDataset(updated);
     await loadDatasets();
     setDeleteEntryId(null);
-    
+
     toast({
       title: "Entry deleted",
       description: "Entry has been deleted successfully"
@@ -108,7 +108,7 @@ const Datasets = () => {
     }
     await loadDatasets();
     setDeleteDatasetId(null);
-    
+
     toast({
       title: "Dataset deleted",
       description: "Dataset has been deleted successfully"
@@ -116,12 +116,12 @@ const Datasets = () => {
   };
 
   const filteredDatasets = datasets.filter(ds => {
-    const matchesType = filterType === "all" || 
-                       (filterType === "single" && ds.type === "single-turn") ||
-                       (filterType === "multi" && ds.type === "multi-turn");
-    const matchesSearch = searchQuery === "" || 
-                         ds.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         ds.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesType = filterType === "all" ||
+      (filterType === "single" && ds.type === "single-turn") ||
+      (filterType === "multi" && ds.type === "multi-turn");
+    const matchesSearch = searchQuery === "" ||
+      ds.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ds.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesType && matchesSearch;
   });
 
@@ -134,7 +134,7 @@ const Datasets = () => {
               <Plus className="h-4 w-4 mr-2" />
               New Dataset
             </Button>
-            
+
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -145,7 +145,7 @@ const Datasets = () => {
               />
             </div>
           </div>
-          
+
           <div className="px-4 py-3 border-b border-border">
             <Tabs value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)} className="w-full">
               <TabsList className="w-full grid grid-cols-3">
@@ -160,12 +160,11 @@ const Datasets = () => {
             <div className="p-4 space-y-3">
               {filteredDatasets.map((dataset) => (
                 <div key={dataset.id} className="relative group">
-                  <Card 
-                    className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-                      selectedDataset?.id === dataset.id 
-                        ? "ring-2 ring-primary bg-primary/5" 
-                        : "hover:bg-muted/50"
-                    }`}
+                  <Card
+                    className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedDataset?.id === dataset.id
+                      ? "ring-2 ring-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                      }`}
                     onClick={() => setSelectedDataset(dataset)}
                   >
                     <CardContent className="p-4">
@@ -184,11 +183,11 @@ const Datasets = () => {
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
-                            <Badge 
-                              variant={dataset.type === "single-turn" ? "default" : "secondary"} 
+                            <Badge
+                              variant={dataset.type === "single-turn" ? "default" : "secondary"}
                               className="text-xs"
                             >
                               {dataset.type === "single-turn" ? "Single Turn" : "Multi Turn"}
@@ -197,7 +196,7 @@ const Datasets = () => {
                               {dataset.entries.length} entries
                             </Badge>
                           </div>
-                          
+
                           {dataset.tags && dataset.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {dataset.tags.slice(0, 3).map(tag => (
@@ -213,7 +212,7 @@ const Datasets = () => {
                             </div>
                           )}
                         </div>
-                        
+
                         {dataset.description && (
                           <p className="text-xs text-muted-foreground line-clamp-2">
                             {dataset.description}
@@ -224,7 +223,7 @@ const Datasets = () => {
                   </Card>
                 </div>
               ))}
-              
+
               {filteredDatasets.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -262,14 +261,14 @@ const Datasets = () => {
                       <Settings2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   {selectedDataset.description && (
                     <p className="text-muted-foreground text-base">{selectedDataset.description}</p>
                   )}
-                  
+
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <Badge 
+                      <Badge
                         variant={selectedDataset.type === "single-turn" ? "default" : "secondary"}
                         className="text-sm"
                       >
@@ -279,7 +278,7 @@ const Datasets = () => {
                         {selectedDataset.entries.length} entries
                       </span>
                     </div>
-                    
+
                     {selectedDataset.tags && selectedDataset.tags.length > 0 && (
                       <div className="flex gap-2">
                         {selectedDataset.tags.map(tag => (
@@ -289,7 +288,7 @@ const Datasets = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="flex gap-3">
                   <Button onClick={() => {
                     setEditingEntry(undefined);
@@ -338,16 +337,16 @@ const Datasets = () => {
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-3">
                                 <CardTitle className="text-lg">{entry.title || "Untitled Entry"}</CardTitle>
-                                <Badge 
-                                  variant={entry.type === "single-turn" ? "default" : "secondary"} 
+                                <Badge
+                                  variant={entry.type === "single-turn" ? "default" : "secondary"}
                                   className="text-xs"
                                 >
                                   {entry.type === "single-turn" ? "Single Turn" : "Multi Turn"}
                                 </Badge>
                               </div>
                               <div className="flex gap-1">
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   variant="ghost"
                                   onClick={() => {
                                     setEditingEntry(entry);
@@ -357,8 +356,8 @@ const Datasets = () => {
                                 >
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   variant="ghost"
                                   onClick={() => setDeleteEntryId(entry.id)}
                                   className="h-8 w-8 p-0 text-destructive hover:text-destructive"
@@ -400,13 +399,12 @@ const Datasets = () => {
                                   <p className="text-sm font-medium mb-3 text-foreground">Conversation:</p>
                                   <div className="space-y-3">
                                     {entry.conversation?.map((msg, idx) => (
-                                      <div 
-                                        key={idx} 
-                                        className={`p-4 rounded-lg border ${
-                                          msg.role === "user" 
-                                            ? "bg-primary/5 border-primary/20 ml-6" 
-                                            : "bg-muted/30 border-border mr-6"
-                                        }`}
+                                      <div
+                                        key={idx}
+                                        className={`p-4 rounded-lg border ${msg.role === "user"
+                                          ? "bg-primary/5 border-primary/20 ml-6"
+                                          : "bg-muted/30 border-border mr-6"
+                                          }`}
                                       >
                                         <p className="text-xs font-medium mb-2 capitalize text-muted-foreground">{msg.role}</p>
                                         <p className="text-sm text-foreground">{msg.content}</p>
@@ -420,19 +418,19 @@ const Datasets = () => {
                                     <div className="bg-muted/30 p-4 rounded-lg border space-y-2">
                                       {entry.user_behavior.style && (
                                         <p className="text-sm">
-                                          <span className="font-medium text-foreground">Style:</span> 
+                                          <span className="font-medium text-foreground">Style:</span>
                                           <span className="text-muted-foreground ml-2">{entry.user_behavior.style}</span>
                                         </p>
                                       )}
                                       {entry.user_behavior.formality && (
                                         <p className="text-sm">
-                                          <span className="font-medium text-foreground">Formality:</span> 
+                                          <span className="font-medium text-foreground">Formality:</span>
                                           <span className="text-muted-foreground ml-2">{entry.user_behavior.formality}</span>
                                         </p>
                                       )}
                                       {entry.user_behavior.goal && (
                                         <p className="text-sm">
-                                          <span className="font-medium text-foreground">Goal:</span> 
+                                          <span className="font-medium text-foreground">Goal:</span>
                                           <span className="text-muted-foreground ml-2">{entry.user_behavior.goal}</span>
                                         </p>
                                       )}

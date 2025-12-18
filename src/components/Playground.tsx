@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,7 +65,7 @@ const Playground = ({
   const [activeConversationId, setActiveConversationId] = useState<string>("");
   const [config, setConfig] = useState<LLMConfig>({
     provider: "google",
-    model: "gemini-2.5-flash",
+    model: "models/gemini-flash-latest",
     temperature: 0.7,
     maxTokens: 500,
     topP: 0.9,
@@ -78,9 +79,9 @@ const Playground = ({
   const [abTestGenerating, setAbTestGenerating] = useState<
     Record<string, boolean>
   >({});
-  
+
   const [processedPromptText, setProcessedPromptText] = useState(promptText);
-  
+
   const [processedSystemPrompt, setProcessedSystemPrompt] =
     useState(systemPrompt);
   const [editableSystemPrompt, setEditableSystemPrompt] =
@@ -102,20 +103,20 @@ const Playground = ({
 
   const loadPlaygroundConversations = async () => {
     if (!prompt?.id) return;
-    
+
     try {
       const playgrounds = await db.playgrounds
         .where('prompt_id')
         .equals(prompt.id)
         .toArray();
-      
+
       const loadedConversations = playgrounds.map(playground => ({
         id: playground.id,
         name: playground.name,
         messages: playground.messages,
         isGenerating: false
       }));
-      
+
       setConversations(loadedConversations);
       if (loadedConversations.length > 0) {
         setActiveConversationId(loadedConversations[0].id);
@@ -165,7 +166,7 @@ const Playground = ({
           prev.requestCount === 0
             ? latency
             : (prev.averageLatency * prev.requestCount + latency) /
-              (prev.requestCount + 1),
+            (prev.requestCount + 1),
       };
       return newStats;
     });
@@ -294,10 +295,10 @@ const Playground = ({
         prev.map((c) =>
           c.id === conversationId
             ? {
-                ...c,
-                messages: [...c.messages, assistantMessage],
-                isGenerating: false,
-              }
+              ...c,
+              messages: [...c.messages, assistantMessage],
+              isGenerating: false,
+            }
             : c
         )
       );
@@ -364,10 +365,10 @@ const Playground = ({
         prev.map((c) =>
           c.id === conversationId
             ? {
-                ...c,
-                messages: updatedMessages,
-                isGenerating: false,
-              }
+              ...c,
+              messages: updatedMessages,
+              isGenerating: false,
+            }
             : c
         )
       );
@@ -407,7 +408,7 @@ const Playground = ({
 
     setConversations((prev) => [...prev, newConversation]);
     setActiveConversationId(newConversation.id);
-    
+
     // Auto-save empty conversation to database
     saveConversationToDatabase(newConversation.id, []);
   };
@@ -439,14 +440,12 @@ const Playground = ({
     }
   };
 
-  // Initialize with first conversation if none exist
   useEffect(() => {
     if (conversations.length === 0) {
       handleNewConversation();
     }
   }, []);
 
-  // Initialize A/B test configs
   useEffect(() => {
     let configs: ABTestConfig[] = [];
 
@@ -494,7 +493,7 @@ const Playground = ({
     setAbTestConfigs(configs);
   }, [promptText, systemPrompt, config, prompt]);
 
-  // A/B Testing functions
+
   const handleABTestSendMessage = async (configId: string, message: string) => {
     if (!message.trim()) return;
 
@@ -688,7 +687,7 @@ const Playground = ({
               variables={{}}
               onPromptChange={setProcessedPromptText}
               onSystemPromptChange={setProcessedSystemPrompt}
-              onVariablesChange={() => {}}
+              onVariablesChange={() => { }}
             />
           </TabsContent>
 

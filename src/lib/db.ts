@@ -1,6 +1,5 @@
 import Dexie, { Table } from 'dexie';
 
-// Type definitions
 export interface Prompt {
   id: string;
   name: string;
@@ -24,7 +23,7 @@ export interface PromptVersion {
     model?: string;
   };
   created_at: string;
- 
+
 }
 
 export interface Dataset {
@@ -46,6 +45,8 @@ export interface DatasetEntry {
   prompt?: string;
   input?: string;
   conversation?: ConversationMessage[];
+  expected_behavior?: string;
+  extractedPrompt?: string;
   created_at: string;
 }
 
@@ -103,7 +104,7 @@ export interface EvalResult {
   dataset_entry_id: string;
   eval_type: 'single-turn' | 'multi-turn';
   metrics: Record<string, any>;
-  reason?:string;
+  reason?: string;
   timestamp: string;
   cost?: {
     eval_tokens: number;
@@ -149,7 +150,7 @@ export interface EvaluationPrompt {
   name: string;
   prompt: string;
   created_at: string;
-  schema:Record<string, any>;
+  schema: Record<string, any>;
 }
 
 export interface ExtractionPrompt {
@@ -207,14 +208,14 @@ export class PromptEvalDB extends Dexie {
       playground_sessions: 'id, prompt_id, prompt_version, model, timestamp',
       settings: 'id'
     });
-    
+
     this.version(2).stores({
       prompts: 'id, name, type, folder, created_at, updated_at',
       datasets: 'id, name, type, folder, created_at, *tags, extraction_prompt',
       evaluation_prompts: 'id, name, created_at',
       extraction_prompts: 'id, name, created_at'
     });
-    
+
     this.version(3).stores({
       prompts: 'id, name, type, folder, created_at, updated_at',
       datasets: 'id, name, type, folder, created_at, *tags, extraction_prompt',

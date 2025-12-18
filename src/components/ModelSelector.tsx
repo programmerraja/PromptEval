@@ -25,7 +25,7 @@ const ModelSelector = ({ config, onConfigChange, disabled = false }: ModelSelect
       case "anthropic":
         return "claude-3-5-sonnet-20241022";
       case "google":
-        return "gemini-2.5-flash";
+        return models / gemini - flash - latest;
       default:
         return "gpt-4o-mini";
     }

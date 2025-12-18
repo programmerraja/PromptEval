@@ -35,14 +35,14 @@ interface SingleTurnEvaluationProps {
   onEvaluatorPromptChange: (prompt: string) => void;
   selectedCustomPrompt: string;
   onSelectedCustomPromptChange: (prompt: string) => void;
-  
+
   // Run state props
   isRunning: boolean;
   progress: number;
   currentEntry: string;
   error: string;
   onRunEvaluation: () => void;
-  
+
   // Results props
   evalResults: EvalResult[];
   prompts: Prompt[];
@@ -88,11 +88,11 @@ const SingleTurnEvaluation = ({
     const datasetsData = await db.datasets.toArray();
     const customPromptsData = await db.evaluation_prompts.toArray();
     const settingsData = await db.settings.get('default');
-    
+
     setDatasets(datasetsData);
     setCustomEvalPrompts(customPromptsData);
     setSettings(settingsData);
-    
+
     // Set default evaluation prompt from settings
     if (settingsData?.default_evaluation_prompt) {
       onEvaluatorPromptChange(settingsData.default_evaluation_prompt);
@@ -174,7 +174,7 @@ const SingleTurnEvaluation = ({
                 <SelectValue placeholder="Select version" />
               </SelectTrigger>
               <SelectContent>
-                {selectedPrompt && getSelectedPrompt() && 
+                {selectedPrompt && getSelectedPrompt() &&
                   Object.keys(getSelectedPrompt()!.versions).map(v => (
                     <SelectItem key={v} value={v}>{v}</SelectItem>
                   ))
@@ -186,8 +186,8 @@ const SingleTurnEvaluation = ({
 
         <div className="space-y-4 border-t pt-4">
           <div className="flex items-center space-x-2">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               id="customEval"
               checked={useCustomEvaluator}
               onChange={(e) => onUseCustomEvaluatorChange(e.target.checked)}
@@ -219,12 +219,12 @@ const SingleTurnEvaluation = ({
                 </Button>
               </div>
             </div>
-            
+
             <div className="space-y-3">
               <div>
                 <Label htmlFor="prompt-source">Select Evaluation Prompt</Label>
-                <Select 
-                  value={selectedCustomPrompt || "default"} 
+                <Select
+                  value={selectedCustomPrompt || "default"}
                   onValueChange={(value) => {
                     if (value === "default") {
                       onSelectedCustomPromptChange("");
@@ -251,7 +251,7 @@ const SingleTurnEvaluation = ({
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {evaluatorPrompt && (
                 <div className="space-y-2">
                   <Label>Selected Prompt Preview</Label>
@@ -293,37 +293,7 @@ const SingleTurnEvaluation = ({
           </div>
         )}
 
-        {evalResults.length > 0 && (
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="text-lg font-semibold">Evaluation Results</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Prompt</TableHead>
-                  <TableHead>Dataset Entry</TableHead>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Tone</TableHead>
-                  <TableHead>Clarity</TableHead>
-                  <TableHead>Overall</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {evalResults.slice().reverse().map((result) => (
-                  <TableRow key={result.id}>
-                    <TableCell>{prompts.find(p => p.id === result.prompt_id)?.name || 'Unknown'}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{result.dataset_entry_id}</TableCell>
-                    <TableCell>{result.metrics.task_completion?.toFixed(1) || '-'}</TableCell>
-                    <TableCell>{result.metrics.tone?.toFixed(1) || '-'}</TableCell>
-                    <TableCell>{result.metrics.clarity?.toFixed(1) || '-'}</TableCell>
-                    <TableCell className="font-medium">{result.metrics.overall?.toFixed(1) || '-'}</TableCell>
-                    <TableCell>{new Date(result.timestamp).toLocaleDateString()}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+
       </CardContent>
 
       <EvaluationPromptManager

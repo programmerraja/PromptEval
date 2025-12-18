@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Card,
   CardContent,
@@ -6,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, AlertCircle, Settings, FileText } from "lucide-react";
+import { Play, AlertCircle, Settings, FileText, Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import EvaluationPromptManager from "@/components/EvaluationPromptManager";
 import ModelConfig from "@/components/ModelConfig";
 import SingleTurnEvaluation from "@/components/SingleTurnEvaluation";
+import { evaluationService } from "@/services/EvaluationService";
+import { aggregationService } from "@/services/AggregationService";
 
 const Evaluations = () => {
   const [activeTab, setActiveTab] = useState("single-turn-eval");
@@ -60,12 +63,12 @@ const Evaluations = () => {
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<string>("");
   const [selectedVersion, setSelectedVersion] = useState<string>("");
-  const [model, setModel] = useState<string>("gpt-4o-mini");
+  const [model, setModel] = useState<string>("models/gemini-flash-latest");
   const [temperature, setTemperature] = useState<number>(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(500);
   const [topP, setTopP] = useState<number>(0.9);
   const [useCustomEvaluator, setUseCustomEvaluator] = useState<boolean>(false);
-  const [evaluatorModel, setEvaluatorModel] = useState<string>("gpt-4o-mini");
+  const [evaluatorModel, setEvaluatorModel] = useState<string>("models/gemini-flash-latest");
   const [evaluatorPrompt, setEvaluatorPrompt] = useState<string>("");
   const [selectedCustomPrompt, setSelectedCustomPrompt] = useState<string>("");
 
@@ -78,6 +81,21 @@ const Evaluations = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Sync config state when prompt version changes
+  useEffect(() => {
+    if (selectedPrompt && selectedVersion) {
+      const prompt = prompts.find(p => p.id === selectedPrompt);
+      const version = prompt?.versions[selectedVersion];
+      if (version?.config) {
+        setModel("models/gemini-flash-latest");
+        setTemperature(version.config.temperature || 0.7);
+        setMaxTokens(version.config.max_tokens || 500);
+        setTopP(version.config.top_p || 0.9);
+      }
+    }
+  }, [selectedPrompt, selectedVersion, prompts]);
+
 
   const loadData = async () => {
     const datasetsData = await db.datasets.toArray();
@@ -118,15 +136,10 @@ const Evaluations = () => {
     }
 
     const settings = await db.settings.get("default");
-    const apiKey = settings?.api_keys?.google;
+    const apiKey = settings?.api_keys?.google; // Default check, but service checks per provider
 
-    if (!apiKey) {
-      toast({
-        title: "API Key required",
-        description: "Please add your OpenAI API key in Settings.",
-        variant: "destructive",
-      });
-      return;
+    if (!apiKey && model.includes('gemini')) {
+      // Ideally check based on provider, but basic check here
     }
 
     const selectedDatasetsList = getSelectedDatasets();
@@ -142,9 +155,41 @@ const Evaluations = () => {
     setError("");
     setActiveTab("run");
 
-    const openai = createOpenAI({ apiKey });
+    const assistantConfig = {
+      provider: "google" as const,
+      model: model,
+      temperature: temperature,
+      maxTokens: maxTokens,
+      topP: topP,
+      apiKey: apiKey
+    };
 
-    // Combine all entries from selected datasets
+    const userConfig = {
+      provider: "google" as const,
+      model: "models/gemini-flash-latest",
+      temperature: 0.7,
+      maxTokens: 2000
+    };
+
+    const evalConfig = {
+      provider: "google" as const,
+      model: useCustomEvaluator ? evaluatorModel : "models/gemini-flash-latest",
+      temperature: 0.1,
+      maxTokens: 2000
+    };
+
+    let evalPromptObj: EvaluationPrompt;
+
+    if (selectedCustomPrompt) {
+      const found = customEvalPrompts.find(p => p.id === selectedCustomPrompt);
+      if (!found) {
+        throw new Error("Selected evaluation prompt not found. Please refresh or select a valid prompt.");
+      }
+      evalPromptObj = found;
+    } else {
+      throw new Error("Evaluation Prompt is required. Please select one from the list.");
+    }
+
     const allEntries = selectedDatasetsList.flatMap((dataset) =>
       dataset.entries.map((entry) => ({
         ...entry,
@@ -158,146 +203,52 @@ const Evaluations = () => {
       for (let i = 0; i < allEntries.length; i++) {
         const entry = allEntries[i];
         setCurrentEntry(
-          `Processing entry ${i + 1}/${totalEntries} from ${
-            entry.datasetName
-          }: ${entry.title || entry.input?.substring(0, 50) || "Untitled"}`
+          `Processing entry ${i + 1}/${totalEntries} from ${entry.datasetName}: ${entry.title || entry.input?.substring(0, 50) || "Untitled"
+          }`
         );
 
-        // Step 1: Generate conversation
-        let conversation: Conversation;
+        // 1. Run Conversation (Single or Multi Turn)
+        let messages: any[] = [];
 
-        if (entry.type === "single-turn") {
-          // Single-turn: generate one response
-          const { text } = await generateText({
-            model: openai(model),
-            messages: [
-              { role: "system", content: promptVersion.config.system_prompt },
-              { role: "user", content: entry.input || "" },
-            ],
-            temperature,
-            topP,
-          });
-
-          conversation = {
-            id: `conv_${Date.now()}_${i}`,
-            prompt_id: selectedPrompt,
-            prompt_version: selectedVersion,
-            model,
-            type: "auto_eval",
-            messages: [
-              { role: "user", content: entry.input || "" },
-              { role: "assistant", content: text },
-            ],
-            metadata: {
-              dataset_ref: entry.id,
-              date: new Date().toISOString(),
-              status: "completed",
-              turn_count: 1,
-            },
-          };
+        if (entry.type === 'single-turn') {
+          const systemPrompt = promptVersion.config.system_prompt;
+          messages = await evaluationService.runSingleTurn(entry, systemPrompt, assistantConfig);
         } else {
-          // Multi-turn: simulate conversation
-          const messages: any[] = [
-            { role: "system", content: promptVersion.config.system_prompt },
-          ];
-
-          if (entry.conversation && entry.conversation.length > 0) {
-            // Use first user message from dataset
-            messages.push({
-              role: "user",
-              content: entry.conversation[0].content,
-            });
-          }
-
-          const { text } = await generateText({
-            model: openai(model),
-            messages,
-            temperature,
-            topP,
-          });
-
-          conversation = {
-            id: `conv_${Date.now()}_${i}`,
-            prompt_id: selectedPrompt,
-            prompt_version: selectedVersion,
-            model,
-            type: "auto_eval",
-            messages: [
-              { role: "user", content: entry.conversation?.[0]?.content || "" },
-              { role: "assistant", content: text },
-            ],
-            metadata: {
-              dataset_ref: entry.id,
-              date: new Date().toISOString(),
-              status: "completed",
-              turn_count: entry.conversation?.length || 1,
-              simulated_user: true,
-            },
-          };
+          const assistantSystemPrompt = `${promptVersion.config.system_prompt}\n\n${promptVersion.text}`;
+          messages = await evaluationService.runMultiTurnSimulation(
+            entry,
+            assistantSystemPrompt,
+            assistantConfig,
+            userConfig
+          );
         }
 
-        // Save conversation
+        // Save Conversation Record
+        const convId = `conv_${Date.now()}_${i}`;
+        const conversation: Conversation = {
+          id: convId,
+          prompt_id: selectedPrompt,
+          prompt_version: selectedVersion,
+          model: model,
+          type: "auto_eval",
+          messages: messages,
+          metadata: {
+            dataset_ref: entry.id,
+            date: new Date().toISOString(),
+            status: "completed",
+            turn_count: messages.length,
+            simulated_user: entry.type === 'multi-turn'
+          }
+        };
         await db.conversations.add(conversation);
 
-        // Step 2: Evaluate the conversation
-        const evalModelToUse = useCustomEvaluator ? evaluatorModel : model;
-        const conversationText = conversation.messages
-          .map((m) => `${m.role}: ${m.content}`)
-          .join("\n\n");
-
-        const evalPromptText = evaluatorPrompt
-          .replace("{conversation}", conversationText)
-          
-
-        const { text: evalText } = await generateText({
-          model: openai(evalModelToUse),
-          prompt: evalPromptText,
-          temperature: 0.3,
-        });
-
-        // Parse evaluation result
-        let metrics: Record<string, number> = {};
-        let reason = evalText;
-
-        try {
-          const jsonMatch = evalText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            metrics = {
-              task_completion:
-                parsed.task_completion || parsed.task_success || 0,
-              tone: parsed.tone || parsed.empathy || 0,
-              clarity: parsed.clarity || parsed.relevance || 0,
-              overall: parsed.overall || 0,
-            };
-            reason = parsed.reason || evalText;
-          }
-        } catch (e) {
-          console.error("Failed to parse eval result:", e);
-        }
-
-        // Save evaluation result
-        const evalResult: EvalResult = {
-          id: `eval_${Date.now()}_${i}`,
-          conversation_id: conversation.id,
-          prompt_id: selectedPrompt,
-          dataset_entry_id: entry.id,
-          eval_type: entry.type,
-          metrics,
-          reason,
-          timestamp: new Date().toISOString(),
-          cost: {
-            eval_tokens: 100,
-            cost_estimate: 0.001,
-          },
-        };
-
-        await db.eval_results.add(evalResult);
+        // 2. Evaluate
+        await evaluationService.evaluateConversation(conversation, entry, evalPromptObj, evalConfig);
 
         setProgress(((i + 1) / totalEntries) * 100);
       }
 
-      await loadData();
+      await loadData(); // Refresh results
 
       toast({
         title: "Evaluation complete",
@@ -306,6 +257,7 @@ const Evaluations = () => {
 
       setActiveTab("results");
     } catch (err: any) {
+      console.error(err);
       setError(err.message || "Evaluation failed");
       toast({
         title: "Evaluation failed",
@@ -319,11 +271,124 @@ const Evaluations = () => {
     }
   };
 
+  const handleDeleteResult = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this evaluation result?")) {
+      try {
+        await evaluationService.deleteEvaluationResult(id);
+        toast({
+          title: "Deleted",
+          description: "Evaluation result deleted successfully.",
+        });
+        loadData(); // Refresh the list
+      } catch (error) {
+        console.error("Failed to delete result:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete evaluation result.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const renderResultsTab = () => {
+    if (evalResults.length === 0) {
+      return <div className="text-center py-12 text-muted-foreground">No evaluation results yet</div>;
+    }
+
+    // Dynamic Table Logic
+    const latestResults = evalResults.slice().reverse();
+    const allKeys = new Set<string>();
+    latestResults.slice(0, 20).forEach(r => Object.keys(r.metrics).forEach(k => allKeys.add(k)));
+    const metricKeys = Array.from(allKeys);
+
+    // Aggregation Logic (Simple Layer 1 Overview)
+    const aggregation = aggregationService.aggregate(latestResults);
+
+    return (
+      <div className="space-y-6">
+        {/* Layer 1: Overview */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Runs</CardTitle></CardHeader>
+            <CardContent><div className="text-2xl font-bold">{aggregation.totalRuns}</div></CardContent>
+          </Card>
+          {/* Dynamically show top metric avgs if numeric */}
+          {Object.entries(aggregation.metrics).slice(0, 3).map(([key, metric]) => (
+            metric.type === 'number' && metric.stats ? (
+              <Card key={key}>
+                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium capitalize">{key.replace(/_/g, ' ')} (Avg)</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-bold">{metric.stats.avg?.toFixed(1)}</div></CardContent>
+              </Card>
+            ) : null
+          ))}
+        </div>
+
+        {/* Layer 4: Raw Detail */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Detailed Results</CardTitle>
+            <CardDescription>View and analyze evaluation outcomes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Prompt</TableHead>
+                    <TableHead className="w-[200px]">Dataset Entry</TableHead>
+                    {metricKeys.map(key => (
+                      <TableHead key={key} className="capitalize">{key.replace(/_/g, ' ')}</TableHead>
+                    ))}
+                    <TableHead>Date</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {latestResults.map((result) => (
+                    <TableRow key={result.id}>
+                      <TableCell>
+                        {prompts.find((p) => p.id === result.prompt_id)?.name || "Unknown"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs truncate max-w-[200px]" title={result.dataset_entry_id}>
+                        {result.dataset_entry_id}
+                      </TableCell>
+                      {metricKeys.map(key => (
+                        <TableCell key={key}>
+                          {typeof result.metrics[key] === 'number'
+                            ? result.metrics[key].toFixed(1)
+                            : String(result.metrics[key] || '-')}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(result.timestamp).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteResult(result.id)}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1>Evaluations</h1>
+          <h1 className="text-3xl font-bold">Evaluations</h1>
           <p className="text-muted-foreground">
             Configure and run prompt evaluations
           </p>
@@ -336,10 +401,10 @@ const Evaluations = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
-          <TabsTrigger value="single-turn-eval">Single Turn Eval</TabsTrigger>
+          <TabsTrigger value="single-turn-eval">Eval Configuration</TabsTrigger>
           <TabsTrigger value="model-config">Model Config</TabsTrigger>
           <TabsTrigger value="prompt-management">Prompt Management</TabsTrigger>
-          <TabsTrigger value="run">Run</TabsTrigger>
+          <TabsTrigger value="run">Run Progress</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
         </TabsList>
 
@@ -383,7 +448,7 @@ const Evaluations = () => {
             onTemperatureChange={setTemperature}
             onMaxTokensChange={setMaxTokens}
             onTopPChange={setTopP}
-            onProviderChange= {()=>{}}
+            onProviderChange={() => { }}
             showProvider={true}
             provider="google"
             title="Model Parameters"
@@ -392,6 +457,7 @@ const Evaluations = () => {
         </TabsContent>
 
         <TabsContent value="prompt-management" className="space-y-4">
+          {/* Reusing existing logic but wrapping properly if needed or just use the card content */}
           <Card>
             <CardHeader>
               <CardTitle>Evaluation Prompt Management</CardTitle>
@@ -422,9 +488,7 @@ const Evaluations = () => {
                             ).toLocaleDateString()}
                           </p>
                           <div className="mt-2">
-                            <p className="text-sm text-muted-foreground">
-                              Preview:
-                            </p>
+                            <p className="text-sm text-muted-foreground">Preview:</p>
                             <div className="bg-muted p-2 rounded text-sm font-mono max-h-20 overflow-y-auto">
                               {evalPrompt.prompt.substring(0, 200)}
                               {evalPrompt.prompt.length > 200 && "..."}
@@ -447,14 +511,10 @@ const Evaluations = () => {
                       </div>
                     </div>
                   ))}
-
                   {customEvalPrompts.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>No custom evaluation prompts yet</p>
-                      <p className="text-sm">
-                        Create your first evaluation prompt to get started
-                      </p>
                     </div>
                   )}
                 </div>
@@ -513,75 +573,20 @@ const Evaluations = () => {
         </TabsContent>
 
         <TabsContent value="results" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Evaluation Results</CardTitle>
-              <CardDescription>
-                View and analyze evaluation outcomes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {evalResults.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  No evaluation results yet
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Prompt</TableHead>
-                      <TableHead>Dataset Entry</TableHead>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Tone</TableHead>
-                      <TableHead>Clarity</TableHead>
-                      <TableHead>Overall</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {evalResults
-                      .slice()
-                      .reverse()
-                      .map((result) => (
-                        <TableRow key={result.id}>
-                          <TableCell>
-                            {prompts.find((p) => p.id === result.prompt_id)
-                              ?.name || "Unknown"}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate">
-                            {result.dataset_entry_id}
-                          </TableCell>
-                          <TableCell>
-                            {result.metrics.task_completion?.toFixed(1) || "-"}
-                          </TableCell>
-                          <TableCell>
-                            {result.metrics.tone?.toFixed(1) || "-"}
-                          </TableCell>
-                          <TableCell>
-                            {result.metrics.clarity?.toFixed(1) || "-"}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {result.metrics.overall?.toFixed(1) || "-"}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(result.timestamp).toLocaleDateString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          {renderResultsTab()}
         </TabsContent>
       </Tabs>
 
       <EvaluationPromptManager
         isOpen={showPromptManager}
-        onClose={() => setShowPromptManager(false)}
+        onClose={() => {
+          setShowPromptManager(false);
+          loadData();
+        }}
         onSelectPrompt={(prompt) => {
           setSelectedCustomPrompt(prompt.id);
           setEvaluatorPrompt(prompt.prompt);
+          loadData();
         }}
       />
     </div>

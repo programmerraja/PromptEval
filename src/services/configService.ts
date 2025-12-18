@@ -49,12 +49,12 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
   google: {
     name: "google",
     displayName: "Google",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: "models/gemini-flash-latest",
     defaultTemperature: 0.7,
     defaultMaxTokens: 500,
     defaultTopP: 0.9,
     models: [
-      { name: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash", maxTokens: 4096, supportsTopP: true },
+      { name: "models/gemini-flash-latest", displayName: "Gemini Flash", maxTokens: 4096, supportsTopP: true },
       { name: "gemini-2.5-pro", displayName: "Gemini 2.5 Pro", maxTokens: 4096, supportsTopP: true },
       { name: "gemini-1.5-pro", displayName: "Gemini 1.5 Pro", maxTokens: 4096, supportsTopP: true },
       { name: "gemini-1.5-flash", displayName: "Gemini 1.5 Flash", maxTokens: 4096, supportsTopP: true }
@@ -91,14 +91,14 @@ export class ConfigService {
   getModelConfig(provider: string, model: string): ModelConfig | null {
     const providerConfig = this.getProviderConfig(provider);
     if (!providerConfig) return null;
-    
+
     return providerConfig.models.find(m => m.name === model) || null;
   }
 
   getDefaultConfig(provider: string) {
     const providerConfig = this.getProviderConfig(provider);
     if (!providerConfig) return DEFAULT_CONFIG;
-    
+
     return {
       provider,
       model: providerConfig.defaultModel,
@@ -116,30 +116,30 @@ export class ConfigService {
     topP: number;
   }): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
-    
+
     const providerConfig = this.getProviderConfig(config.provider);
     if (!providerConfig) {
       errors.push(`Invalid provider: ${config.provider}`);
       return { isValid: false, errors };
     }
-    
+
     const modelConfig = this.getModelConfig(config.provider, config.model);
     if (!modelConfig) {
       errors.push(`Invalid model: ${config.model} for provider: ${config.provider}`);
     }
-    
+
     if (config.temperature < 0 || config.temperature > 2) {
       errors.push("Temperature must be between 0 and 2");
     }
-    
+
     if (config.maxTokens < 1 || config.maxTokens > 4096) {
       errors.push("Max tokens must be between 1 and 4096");
     }
-    
+
     if (config.topP < 0 || config.topP > 1) {
       errors.push("Top P must be between 0 and 1");
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors

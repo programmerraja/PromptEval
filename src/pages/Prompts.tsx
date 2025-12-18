@@ -11,7 +11,6 @@ import Playground from "@/components/Playground";
 import ModelConfig from "@/components/ModelConfig";
 import PromptEditor from "@/components/PromptEditor";
 import VersionManager from "@/components/VersionManager";
-import EvaluationPanel from "@/components/EvaluationPanel";
 
 const Prompts = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -22,7 +21,7 @@ const Prompts = () => {
   const [promptToDelete, setPromptToDelete] = useState<Prompt | null>(null);
   const [showVersionDeleteDialog, setShowVersionDeleteDialog] = useState(false);
   const [versionToDelete, setVersionToDelete] = useState<{ promptId: string; versionId: string } | null>(null);
-  
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -52,8 +51,8 @@ const Prompts = () => {
 
   const loadDatasets = async () => {
     try {
-    const datasetsData = await db.datasets.toArray();
-    setDatasets(datasetsData);
+      const datasetsData = await db.datasets.toArray();
+      setDatasets(datasetsData);
     } catch (error) {
       console.error("Failed to load datasets:", error);
       toast({
@@ -66,37 +65,37 @@ const Prompts = () => {
 
   const createNewPrompt = async () => {
     try {
-    const newPrompt: Prompt = {
-      id: `prompt_${Date.now()}`,
-      name: "New Prompt",
-      type: "single-turn",
-      description: "",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      versions: {
-        v1: {
-          version_id: "v1",
-          text: "",
-          variables: {},
-          config: {
-            temperature: 0.7,
-            max_tokens: 500,
-            top_p: 0.9,
-            system_prompt: "",
-            model: "gpt-4o-mini"
-          },
-          created_at: new Date().toISOString()
+      const newPrompt: Prompt = {
+        id: `prompt_${Date.now()}`,
+        name: "New Prompt",
+        type: "single-turn",
+        description: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        versions: {
+          v1: {
+            version_id: "v1",
+            text: "",
+            variables: {},
+            config: {
+              temperature: 0.7,
+              max_tokens: 500,
+              top_p: 0.9,
+              system_prompt: "",
+              model: "gpt-4o-mini"
+            },
+            created_at: new Date().toISOString()
+          }
         }
-      }
-    };
-    await db.prompts.add(newPrompt);
-    await loadPrompts();
-    setSelectedPrompt(newPrompt);
-    setSelectedVersion("v1");
-    toast({
-      title: "Prompt created",
-      description: "New prompt has been created successfully"
-    });
+      };
+      await db.prompts.add(newPrompt);
+      await loadPrompts();
+      setSelectedPrompt(newPrompt);
+      setSelectedVersion("v1");
+      toast({
+        title: "Prompt created",
+        description: "New prompt has been created successfully"
+      });
     } catch (error) {
       console.error("Failed to create prompt:", error);
       toast({
@@ -116,15 +115,15 @@ const Prompts = () => {
         updated_at: updatedPrompt.updated_at,
         versions: updatedPrompt.versions
       });
-    await loadPrompts();
+      await loadPrompts();
       setSelectedPrompt(updatedPrompt);
     } catch (error) {
       console.error("Failed to save prompt:", error);
-    toast({
+      toast({
         title: "Error",
         description: "Failed to save prompt",
         variant: "destructive"
-    });
+      });
     }
   };
 
@@ -170,7 +169,7 @@ const Prompts = () => {
     await loadPrompts();
     setSelectedPrompt(updatedPrompt);
     setSelectedVersion(newVersionId);
-    
+
     toast({
       title: "Version created",
       description: `New version ${newVersionId} has been created successfully`
@@ -181,16 +180,16 @@ const Prompts = () => {
     if (!promptToDelete) return;
 
     try {
-    await db.prompts.delete(promptToDelete.id);
-    await loadPrompts();
-    setSelectedPrompt(null);
-    setPromptToDelete(null);
-    setShowDeleteDialog(false);
-    
-    toast({
-      title: "Prompt deleted",
-      description: "Prompt has been deleted successfully"
-    });
+      await db.prompts.delete(promptToDelete.id);
+      await loadPrompts();
+      setSelectedPrompt(null);
+      setPromptToDelete(null);
+      setShowDeleteDialog(false);
+
+      toast({
+        title: "Prompt deleted",
+        description: "Prompt has been deleted successfully"
+      });
     } catch (error) {
       console.error("Failed to delete prompt:", error);
       toast({
@@ -205,39 +204,39 @@ const Prompts = () => {
     if (!selectedPrompt) return;
 
     try {
-    // Don't allow deleting the last version
+      // Don't allow deleting the last version
       if (Object.keys(selectedPrompt.versions).length <= 1) {
-      toast({
-        title: "Cannot delete version",
-        description: "Cannot delete the last remaining version",
-        variant: "destructive"
-      });
-      return;
-    }
+        toast({
+          title: "Cannot delete version",
+          description: "Cannot delete the last remaining version",
+          variant: "destructive"
+        });
+        return;
+      }
 
       const updatedVersions = { ...selectedPrompt.versions };
-    delete updatedVersions[versionId];
+      delete updatedVersions[versionId];
 
-    const updatedPrompt = {
+      const updatedPrompt = {
         ...selectedPrompt,
-      versions: updatedVersions,
-      updated_at: new Date().toISOString()
-    };
+        versions: updatedVersions,
+        updated_at: new Date().toISOString()
+      };
 
       await db.prompts.update(selectedPrompt.id, updatedPrompt);
-    await loadPrompts();
-    
-    // If we deleted the currently selected version, switch to v1
+      await loadPrompts();
+
+      // If we deleted the currently selected version, switch to v1
       if (selectedVersion === versionId) {
-      setSelectedVersion("v1");
+        setSelectedVersion("v1");
       }
-      
+
       setSelectedPrompt(updatedPrompt);
-    
-    toast({
-      title: "Version deleted",
-      description: `Version ${versionId} has been deleted successfully`
-    });
+
+      toast({
+        title: "Version deleted",
+        description: `Version ${versionId} has been deleted successfully`
+      });
     } catch (error) {
       console.error("Failed to delete version:", error);
       toast({
@@ -348,7 +347,6 @@ const Prompts = () => {
                 <TabsTrigger value="editor">Editor</TabsTrigger>
                 <TabsTrigger value="model-config">Model Config</TabsTrigger>
                 <TabsTrigger value="playground">Playground</TabsTrigger>
-                <TabsTrigger value="eval">Eval</TabsTrigger>
               </TabsList>
             </div>
 
@@ -360,7 +358,7 @@ const Prompts = () => {
                 onCreateVersion={handleCreateVersion}
                 onVersionChange={switchVersion}
               />
-              
+
               <VersionManager
                 prompt={selectedPrompt}
                 selectedVersion={selectedVersion}
@@ -377,9 +375,9 @@ const Prompts = () => {
                     Configure model parameters for this prompt version
                   </p>
                 </div>
-                
+
                 <ModelConfig
-                  model={selectedPrompt?.versions[selectedVersion]?.config.model || "gpt-4o-mini"}
+                  model={selectedPrompt?.versions[selectedVersion]?.config.model || "models/gemini-flash-latest"}
                   temperature={selectedPrompt?.versions[selectedVersion]?.config.temperature || 0.7}
                   maxTokens={selectedPrompt?.versions[selectedVersion]?.config.max_tokens || 500}
                   topP={selectedPrompt?.versions[selectedVersion]?.config.top_p || 0.9}
@@ -456,8 +454,8 @@ const Prompts = () => {
                     }
                   }}
                   showProvider={true}
-                  provider="openai"
-                  onProviderChange={() => {}}
+                  provider="google"
+                  onProviderChange={() => { }}
                   title="Model Parameters"
                   description="Configure the model settings for this prompt version"
                 />
@@ -471,7 +469,6 @@ const Prompts = () => {
                 prompt={selectedPrompt}
                 onSaveConversation={async (messages) => {
                   try {
-                    // Create a new dataset entry from the conversation
                     const datasetEntry = {
                       id: `entry_${Date.now()}`,
                       type: "multi-turn" as const,
@@ -480,9 +477,8 @@ const Prompts = () => {
                       created_at: new Date().toISOString(),
                     };
 
-                    // Find or create a playground dataset
                     let playgroundDataset = await db.datasets.where("name").equals("Playground Conversations").first();
-                    
+
                     if (!playgroundDataset) {
                       playgroundDataset = {
                         id: `dataset_${Date.now()}`,
@@ -516,14 +512,6 @@ const Prompts = () => {
               />
             </TabsContent>
 
-            <TabsContent value="eval" className="p-6 space-y-6">
-              <EvaluationPanel
-                selectedPrompt={selectedPrompt}
-                selectedVersion={selectedVersion}
-                datasets={datasets}
-                onVersionChange={switchVersion}
-              />
-            </TabsContent>
 
           </Tabs>
         )}

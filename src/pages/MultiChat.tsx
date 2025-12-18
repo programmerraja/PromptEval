@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -21,54 +21,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Play,
-  Pause,
   Square,
   Bot,
   User,
-  Edit2,
-  Trash2,
-  Check,
-  X,
   Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   db,
   ConversationMessage,
-  Prompt,
-  Dataset,
-  DatasetEntry,
 } from "@/lib/db";
 import { useLiveQuery } from "dexie-react-hooks";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { generateText } from "ai";
-
-interface LLMConfig {
-  provider: "openai" | "anthropic" | "google";
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  topP?: number;
-}
-
-interface AssistantState {
-  messages: ConversationMessage[];
-  isGenerating: boolean;
-}
-
-interface UserState {
-  messages: ConversationMessage[];
-  isGenerating: boolean;
-}
-
-interface ConversationState {
-  displayMessages: ConversationMessage[];
-  currentTurn: number;
-  isActive: boolean;
-  currentSpeaker: "assistant" | "user" | null;
-}
+import { useMultiTurnSimulation, LLMConfig } from "@/hooks/useMultiTurnSimulation";
 
 const MultiChat = () => {
   const { toast } = useToast();
@@ -76,16 +40,13 @@ const MultiChat = () => {
   const datasets = useLiveQuery(() => db.datasets.toArray());
 
   const [selectedPromptId, setSelectedPromptId] = useState<string>("");
-
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>("");
-
   const [maxTurns, setMaxTurns] = useState(10);
-
   const [initialMessage, setInitialMessage] = useState("");
+  const [whoStartsFirst, setWhoStartsFirst] = useState<"assistant" | "user">("assistant");
 
-  const [whoStartsFirst, setWhoStartsFirst] = useState<"assistant" | "user">(
-    "assistant"
-  );
+  const [activeTab, setActiveTab] = useState("config");
+  const [settings, setSettings] = useState<any>(null);
 
   const [assistantConfig, setAssistantConfig] = useState<LLMConfig>({
     provider: "google",
@@ -103,128 +64,41 @@ const MultiChat = () => {
     topP: 0.9,
   });
 
-  const getDefaultModel = (
-    provider: "openai" | "anthropic" | "google"
-  ): string => {
-    switch (provider) {
-      case "openai":
-        return "gpt-4o-mini";
-      case "anthropic":
-        return "claude-3-5-sonnet-20241022";
-      case "google":
-        return "gemini-2.5-flash";
-      default:
-        return "gpt-4o-mini";
+  // Use the new hook
+  const { simulationState, startSimulation, stopSimulation, resetSimulation } = useMultiTurnSimulation({
+    onSimulationComplete: (messages, reason) => {
+      toast({
+        title: "Simulation Completed",
+        description: reason,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Simulation Error",
+        description: error,
+        variant: "destructive"
+      })
     }
-  };
-
-  // Use refs for state management
-  const assistantStateRef = useRef<AssistantState>({
-    messages: [],
-    isGenerating: false,
   });
-
-  const userStateRef = useRef<UserState>({
-    messages: [],
-    isGenerating: false,
-  });
-
-  // Dummy state to trigger UI re-renders
-  const [renderTrigger, setRenderTrigger] = useState(0);
-
-  // Helper functions to update refs and trigger re-renders
-  const updateAssistantState = (newState: AssistantState) => {
-    assistantStateRef.current = newState;
-    setRenderTrigger(prev => prev + 1);
-  };
-
-  const updateUserState = (newState: UserState) => {
-    userStateRef.current = newState;
-    setRenderTrigger(prev => prev + 1);
-  };
-
-  const conversationState = useRef<ConversationState>(
-    {
-      displayMessages: [],
-      currentTurn: 0,
-      isActive: false,
-      currentSpeaker: null,
-    }
-  );
-
-
-  const [activeTab, setActiveTab] = useState("config");
-
-  const [settings, setSettings] = useState<any>(null);
 
   useEffect(() => {
     db.settings.get("default").then((s) => setSettings(s));
   }, []);
 
   const selectedPrompt = prompts?.find((p) => p.id === selectedPromptId);
-
   const selectedDataset = datasets?.find((d) => d.id === selectedDatasetId);
+  const multiTurnDatasets = datasets?.filter((d) => d.type === "multi-turn") || [];
 
-  const multiTurnDatasets =
-    datasets?.filter((d) => d.type === "multi-turn") || [];
-
-  const getAIClient = (config: LLMConfig) => {
-    if (!settings) throw new Error("Settings not loaded");
-
-    switch (config.provider) {
-      case "openai":
-        if (!settings.api_keys?.openai)
-          throw new Error("OpenAI API key not configured");
-        return createOpenAI({ apiKey: settings.api_keys.openai });
-      case "anthropic":
-        if (!settings.api_keys?.anthropic)
-          throw new Error("Anthropic API key not configured");
-        return createAnthropic({ apiKey: settings.api_keys.anthropic });
-      case "google":
-        if (!settings.api_keys?.google)
-          throw new Error("Google API key not configured");
-        return createGoogleGenerativeAI({ apiKey: settings.api_keys.google });
-      default:
-        throw new Error("Unknown provider");
+  const getDefaultModel = (provider: "openai" | "anthropic" | "google"): string => {
+    switch (provider) {
+      case "openai": return "gpt-4o-mini";
+      case "anthropic": return "claude-3-5-sonnet-20241022";
+      case "google": return "gemini-2.5-flash";
+      default: return "gpt-4o-mini";
     }
   };
 
- 
-
-  const generateMessage = async (
-    config: LLMConfig,
-    systemPrompt: string,
-    conversationHistory: ConversationMessage[]
-  ) => {
-    const client = getAIClient(config);
-
-    const messages = [
-      { role: "assistant" as const, content: systemPrompt },
-      ...conversationHistory,
-    ] as any;
-
-    const result = await generateText({
-      model: client(config.model),
-      messages,
-      temperature: config.temperature,
-      // maxOutputTokens: config.maxTokens,
-      // topP: config.topP,
-    });
-
-    return result.text;
-  };
-
-  const checkForEnd = (content: string): boolean => {
-    const endPatterns = [
-      /\[END\]/i,
-      /\bEND\b$/i,
-      /conversation.*complete/i,
-      /nothing.*more.*discuss/i,
-    ];
-    return endPatterns.some((pattern) => pattern.test(content));
-  };
-
-  const startConversation = async () => {
+  const handleStartConversation = async () => {
     if (!selectedPromptId || !selectedDatasetId) {
       toast({
         title: "Error",
@@ -260,247 +134,24 @@ const MultiChat = () => {
     }
 
     const assistantSystemPrompt = `${promptVersion.config.system_prompt}\n\n${promptVersion.text}`;
-
-    const userSystemPrompt =`${datasetEntry.prompt || datasetEntry.input}`
-
-    updateAssistantState({ messages: [], isGenerating: false });
-    updateUserState({ messages: [], isGenerating: false });
-    conversationState.current = {
-      displayMessages: [],
-      currentTurn: 0,
-      isActive: true,
-      currentSpeaker: null,
-    };
+    // Use the extractedPrompt if available, otherwise fallback to entry prompt/input
+    const userSystemPrompt = datasetEntry.extractedPrompt || datasetEntry.prompt || datasetEntry.input || "You are a user simulating a conversation.";
 
     setActiveTab("conversation");
-    try {
-      // Start the conversation based on who goes first
-      if (whoStartsFirst === "assistant") {
-        await runAssistantTurn(assistantSystemPrompt, userSystemPrompt, "");
-      } else {
-        await runUserTurn(assistantSystemPrompt, userSystemPrompt, "");
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to start conversation",
-        variant: "destructive",
-      });
-      updateAssistantState({ messages: [], isGenerating: false });
-      updateUserState({ messages: [], isGenerating: false });
-      conversationState.current = {
-        displayMessages: [],
-        currentTurn: 0,
-        isActive: false,
-        currentSpeaker: null,
-      };
-    }
+
+    startSimulation(
+      assistantConfig,
+      userConfig,
+      assistantSystemPrompt,
+      userSystemPrompt,
+      maxTurns,
+      initialMessage,
+      whoStartsFirst
+    );
   };
 
-  const runAssistantTurn = async (
-    assistantSystemPrompt: string,
-    userSystemPrompt: string,
-    replyMessage: string
-  ) => {
-    if (conversationState.current.currentTurn >= maxTurns) {
-      // conversationState.current = {
-      //   ...conversationState.current,
-      //   displayMessages: [],
-      //   currentTurn: 0,
-      //   isActive: false,
-      //   currentSpeaker: null,
-      // };
-      toast({
-        title: "Conversation completed",
-        description: "Max turns reached",
-      });
-      return;
-    }
-
-    if(!conversationState.current.isActive) return;
-
-    try {
-      let content: string;
-      let conversationHistory: ConversationMessage[] = [];
-      if (conversationState.current.currentTurn === 0 && initialMessage ) {
-        content = initialMessage;
-      } else {
-        if (replyMessage) {
-          conversationHistory = [
-            ...assistantStateRef.current.messages,
-            { role: "user", content: replyMessage },
-          ] as ConversationMessage[];
-          content = await generateMessage(
-            assistantConfig,
-            assistantSystemPrompt,
-            conversationHistory
-          );
-        }
-      }
-
-      const assistantMessage: ConversationMessage = {
-        role: "assistant",
-        content,
-      };
-
-      conversationHistory.push(assistantMessage);
-
-      updateAssistantState({ messages: conversationHistory, isGenerating: false });
-      conversationState.current = {
-        ...conversationState.current,
-        displayMessages: conversationHistory,
-        currentTurn: conversationState.current.currentTurn + 1,
-        currentSpeaker: null,
-      };
-
-      if (checkForEnd(content)) {
-        conversationState.current = {
-          ...conversationState.current,
-          isActive: false,
-          currentSpeaker: null,
-        };
-        toast({
-          title: "Conversation ended",
-          description: "Assistant indicated completion",
-        });
-        return;
-      }
-
-      // Continue with user turn
-      setTimeout(() => {
-        runUserTurn(assistantSystemPrompt, userSystemPrompt, content);
-      }, 0);
-    } catch (error) {
-      conversationState.current = {
-        ...conversationState.current,
-        isActive: false,
-        currentSpeaker: null,
-      };
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to generate assistant message",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const runUserTurn = async (
-    assistantSystemPrompt: string,
-    userSystemPrompt: string,
-    replyMessage: string
-  ) => {
-    if (conversationState.current.currentTurn >= maxTurns) {
-      // conversationState.current = {
-      //   ...conversationState.current,
-      //   isActive: false,
-      //   currentSpeaker: null,
-      // };
-      toast({
-        title: "Conversation completed",
-        description: "Max turns reached",
-      });
-      return;
-    }
-
-    if (!conversationState.current.isActive) return;
-
-    // updateUserState({ messages: userStateRef.current.messages, isGenerating: true });
-    conversationState.current = {
-      ...conversationState.current,
-      currentSpeaker: "user",
-    };
-
-    const conversationHistory = [
-      ...userStateRef.current.messages,
-      { role: "user", content: replyMessage },
-    ] as ConversationMessage[];
-
-    try {
-      let content: string;
-      if (conversationState.current.currentTurn === 0 && initialMessage &&  whoStartsFirst === "user") {
-        content = initialMessage;
-      } else {
-        content = await generateMessage(
-          userConfig,
-          userSystemPrompt,
-          conversationHistory
-        );
-      }
-      const userMessage: ConversationMessage = { role: "assistant", content };
-
-      conversationHistory.push(userMessage);
-      updateUserState({ messages: conversationHistory, isGenerating: false });
-
-      conversationState.current = {
-        ...conversationState.current,
-        currentTurn: conversationState.current.currentTurn + 1,
-        
-        currentSpeaker: null,
-      };
-
-      if (checkForEnd(content)) {
-        conversationState.current = {
-          ...conversationState.current,
-          isActive: false,
-          currentSpeaker: null,
-        };
-        toast({
-          title: "Conversation ended",
-          description: "User indicated completion",
-        });
-        return;
-      }
-
-      // Continue with assistant turn
-      setTimeout(() => {
-        runAssistantTurn(assistantSystemPrompt, userSystemPrompt, content);
-      }, 0);
-    } catch (error) {
-      conversationState.current = {
-        ...conversationState.current,
-        isActive: false,
-        currentSpeaker: null,
-      };
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to generate user message",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const stopConversation = () => {
-    updateAssistantState({
-      messages: assistantStateRef.current.messages,
-      isGenerating: false,
-    });
-    updateUserState({ messages: userStateRef.current.messages, isGenerating: false });
-    conversationState.current = {
-      ...conversationState.current,
-      isActive: false,
-      currentSpeaker: null,
-    };
-    toast({ title: "Stopped", description: "Conversation stopped" });
-  };
-
-  const resetConversation = () => {
-    updateAssistantState({ messages: [], isGenerating: false });
-    updateUserState({ messages: [], isGenerating: false });
-    conversationState.current = {
-      displayMessages: [],
-      currentTurn: 0,
-      isActive: false,
-      currentSpeaker: null,
-    };
+  const handleReset = () => {
+    resetSimulation();
     setActiveTab("config");
   };
 
@@ -514,29 +165,24 @@ const MultiChat = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          {!conversationState.current.isActive && (
+          {!simulationState.isActive && (
             <Button
               size="sm"
-              onClick={startConversation}
-              disabled={
-                !selectedPromptId ||
-                !selectedDatasetId ||
-                assistantStateRef.current.isGenerating ||
-                userStateRef.current.isGenerating
-              }
+              onClick={handleStartConversation}
+              disabled={!selectedPromptId || !selectedDatasetId}
             >
               <Play className="h-4 w-4 mr-2" />
               Start Conversation
             </Button>
           )}
-          {conversationState.current.isActive && (
-            <Button size="sm" variant="destructive" onClick={stopConversation}>
+          {simulationState.isActive && (
+            <Button size="sm" variant="destructive" onClick={stopSimulation}>
               <Square className="h-4 w-4 mr-2" />
-              Pause
+              Stop
             </Button>
           )}
-          {conversationState.current.displayMessages.length > 0 && (
-            <Button size="sm" variant="outline" onClick={resetConversation}>
+          {simulationState.messages.length > 0 && !simulationState.isActive && (
+            <Button size="sm" variant="outline" onClick={handleReset}>
               Reset
             </Button>
           )}
@@ -554,18 +200,14 @@ const MultiChat = () => {
             <CardHeader>
               <CardTitle>Conversation Setup</CardTitle>
               <CardDescription>
-                Configure the conversation parameters and select
-                prompts/datasets
+                Configure the conversation parameters and select prompts/datasets
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Prompt</Label>
-                  <Select
-                    value={selectedPromptId}
-                    onValueChange={setSelectedPromptId}
-                  >
+                  <Select value={selectedPromptId} onValueChange={setSelectedPromptId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a prompt" />
                     </SelectTrigger>
@@ -580,10 +222,7 @@ const MultiChat = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Dataset (Multi-turn only)</Label>
-                  <Select
-                    value={selectedDatasetId}
-                    onValueChange={setSelectedDatasetId}
-                  >
+                  <Select value={selectedDatasetId} onValueChange={setSelectedDatasetId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a dataset" />
                     </SelectTrigger>
@@ -604,9 +243,7 @@ const MultiChat = () => {
                   <Input
                     type="number"
                     value={maxTurns}
-                    onChange={(e) =>
-                      setMaxTurns(parseInt(e.target.value) || 10)
-                    }
+                    onChange={(e) => setMaxTurns(parseInt(e.target.value) || 10)}
                     min={1}
                     max={50}
                   />
@@ -615,9 +252,7 @@ const MultiChat = () => {
                   <Label>Who starts first?</Label>
                   <RadioGroup
                     value={whoStartsFirst}
-                    onValueChange={(value: "assistant" | "user") =>
-                      setWhoStartsFirst(value)
-                    }
+                    onValueChange={(value: "assistant" | "user") => setWhoStartsFirst(value)}
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="assistant" id="assistant" />
@@ -636,7 +271,7 @@ const MultiChat = () => {
                 <Textarea
                   value={initialMessage}
                   onChange={(e) => setInitialMessage(e.target.value)}
-                  placeholder="Optional: Provide the first message if assistant starts first"
+                  placeholder="Optional: Provide the first message if assistant starts first, or the user's first query."
                   rows={3}
                 />
               </div>
@@ -662,9 +297,7 @@ const MultiChat = () => {
                       })
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="openai">OpenAI</SelectItem>
                       <SelectItem value="anthropic">Anthropic</SelectItem>
@@ -672,66 +305,29 @@ const MultiChat = () => {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-2">
                   <Label>Model</Label>
                   <Input
                     value={assistantConfig.model}
-                    onChange={(e) =>
-                      setAssistantConfig({
-                        ...assistantConfig,
-                        model: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., gpt-4o-mini"
+                    onChange={(e) => setAssistantConfig({ ...assistantConfig, model: e.target.value })}
                   />
                 </div>
-
+                {/* Temp & MaxTokens inputs omitted for brevity, reusing User Model style or similar if needed. 
+                    Assuming basic config is fine for now, or copy full UI if needed. 
+                    (Re-adding full UI below to match original fidelity) 
+                */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-2">
                     <Label>Temperature</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="2"
-                      value={assistantConfig.temperature}
-                      onChange={(e) =>
-                        setAssistantConfig({
-                          ...assistantConfig,
-                          temperature: parseFloat(e.target.value),
-                        })
-                      }
-                    />
+                    <Input type="number" step="0.1" value={assistantConfig.temperature} onChange={(e) => setAssistantConfig({ ...assistantConfig, temperature: parseFloat(e.target.value) })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Max Tokens</Label>
-                    <Input
-                      type="number"
-                      value={assistantConfig.maxTokens}
-                      onChange={(e) =>
-                        setAssistantConfig({
-                          ...assistantConfig,
-                          maxTokens: parseInt(e.target.value),
-                        })
-                      }
-                    />
+                    <Input type="number" value={assistantConfig.maxTokens} onChange={(e) => setAssistantConfig({ ...assistantConfig, maxTokens: parseInt(e.target.value) })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Top P</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="1"
-                      value={assistantConfig.topP || 0.9}
-                      onChange={(e) =>
-                        setAssistantConfig({
-                          ...assistantConfig,
-                          topP: parseFloat(e.target.value),
-                        })
-                      }
-                    />
+                    <Input type="number" step="0.1" value={assistantConfig.topP} onChange={(e) => setAssistantConfig({ ...assistantConfig, topP: parseFloat(e.target.value) })} />
                   </div>
                 </div>
               </CardContent>
@@ -740,9 +336,7 @@ const MultiChat = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">User Model</CardTitle>
-                <CardDescription>
-                  Simulates user behavior from dataset
-                </CardDescription>
+                <CardDescription>Simulates user behavior from dataset</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -757,9 +351,7 @@ const MultiChat = () => {
                       })
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="openai">OpenAI</SelectItem>
                       <SelectItem value="anthropic">Anthropic</SelectItem>
@@ -767,63 +359,25 @@ const MultiChat = () => {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-2">
                   <Label>Model</Label>
                   <Input
                     value={userConfig.model}
-                    onChange={(e) =>
-                      setUserConfig({ ...userConfig, model: e.target.value })
-                    }
-                    placeholder="e.g., gpt-4o-mini"
+                    onChange={(e) => setUserConfig({ ...userConfig, model: e.target.value })}
                   />
                 </div>
-
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-2">
                     <Label>Temperature</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="2"
-                      value={userConfig.temperature}
-                      onChange={(e) =>
-                        setUserConfig({
-                          ...userConfig,
-                          temperature: parseFloat(e.target.value),
-                        })
-                      }
-                    />
+                    <Input type="number" step="0.1" value={userConfig.temperature} onChange={(e) => setUserConfig({ ...userConfig, temperature: parseFloat(e.target.value) })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Max Tokens</Label>
-                    <Input
-                      type="number"
-                      value={userConfig.maxTokens}
-                      onChange={(e) =>
-                        setUserConfig({
-                          ...userConfig,
-                          maxTokens: parseInt(e.target.value),
-                        })
-                      }
-                    />
+                    <Input type="number" value={userConfig.maxTokens} onChange={(e) => setUserConfig({ ...userConfig, maxTokens: parseInt(e.target.value) })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Top P</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="1"
-                      value={userConfig.topP || 0.9}
-                      onChange={(e) =>
-                        setUserConfig({
-                          ...userConfig,
-                          topP: parseFloat(e.target.value),
-                        })
-                      }
-                    />
+                    <Input type="number" step="0.1" value={userConfig.topP} onChange={(e) => setUserConfig({ ...userConfig, topP: parseFloat(e.target.value) })} />
                   </div>
                 </div>
               </CardContent>
@@ -831,133 +385,58 @@ const MultiChat = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="conversation">
-          <Card>
-            <CardHeader>
+        <TabsContent value="conversation" className="space-y-4">
+          <Card className="h-[600px] flex flex-col">
+            <CardHeader className="border-b py-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Conversation</CardTitle>
-                  <CardDescription>
-                    Turn {conversationState.current.currentTurn} / {maxTurns} · Status:{" "}
-                    {conversationState.current.isActive ? "Active" : "Stopped"} ·
-                    {(assistantStateRef.current.isGenerating || userStateRef.current.isGenerating) &&
-                      `Generating ${conversationState.current.currentSpeaker} message...`}
-                  </CardDescription>
+                  <CardTitle className="text-base">Conversation Live View</CardTitle>
+                  <CardDescription>Turn {simulationState.currentTurn} / {maxTurns}</CardDescription>
                 </div>
+                {simulationState.isActive && (
+                  <div className="flex items-center gap-2 text-primary animate-pulse">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm font-medium">
+                      {simulationState.currentSpeaker === 'assistant' ? 'Assistant Generating...' : 'User Simulation Generating...'}
+                    </span>
+                  </div>
+                )}
               </div>
             </CardHeader>
-            <CardContent className="max-h-[600px] overflow-y-auto">
-              {conversationState.current.displayMessages.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  Configure settings and start a conversation
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {conversationState.current.displayMessages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex gap-3 ${
-                        msg.role === "assistant" ? "justify-end" : ""
-                      }`}
-                    >
-                      <div
-                        className={`flex gap-3 max-w-[80%] ${
-                          msg.role === "assistant" ? "flex-row-reverse" : ""
-                        }`}
-                      >
-                        <div
-                          className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            msg.role === "user"
-                              ? "bg-primary/10"
-                              : "bg-secondary"
-                          }`}
-                        >
-                          {msg.role === "user" ? (
-                            <User className="h-4 w-4" />
-                          ) : (
-                            <Bot className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div className="space-y-1 flex-1">
-                          <div className="text-xs text-muted-foreground font-medium">
-                            {msg.role === "user" ? "AI User" : "AI Assistant"}
-                          </div>
-                          <div
-                            className={`rounded-lg p-3 ${
-                              msg.role === "user"
-                                ? "bg-muted"
-                                : "bg-primary text-primary-foreground"
-                            }`}
-                          >
-                            {msg.content}
-                          </div>
-                        </div>
-                      </div>
+            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+              {simulationState.messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex gap-3 ${msg.role === "assistant" ? "justify-start" : "justify-end"
+                    }`}
+                >
+                  {msg.role === "assistant" && (
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Bot className="h-4 w-4 text-primary" />
                     </div>
-                  ))}
-
-                  {(assistantStateRef.current.isGenerating || userStateRef.current.isGenerating) &&
-                    conversationState.current.currentSpeaker && (
-                      <div
-                        className={`flex gap-3 ${
-                          conversationState.current.currentSpeaker === "assistant"
-                            ? "justify-end"
-                            : ""
-                        }`}
-                      >
-                        <div
-                          className={`flex gap-3 max-w-[80%] ${
-                              conversationState.current.currentSpeaker === "assistant"
-                              ? "flex-row-reverse"
-                              : ""
-                          }`}
-                        >
-                          <div
-                            className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                              conversationState.current.currentSpeaker === "user"
-                                ? "bg-primary/10"
-                                : "bg-secondary"
-                            }`}
-                          >
-                            {conversationState.current.currentSpeaker === "user" ? (
-                              <User className="h-4 w-4" />
-                            ) : (
-                              <Bot className="h-4 w-4" />
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            <div className="text-xs text-muted-foreground font-medium">
-                              {conversationState.current.currentSpeaker === "user"
-                                ? "AI User"
-                                : "AI Assistant"}{" "}
-                              is typing...
-                            </div>
-                            <div
-                              className={`rounded-lg p-3 ${
-                                conversationState.current.currentSpeaker === "user"
-                                  ? "bg-muted"
-                                  : "bg-primary text-primary-foreground"
-                              }`}
-                            >
-                              <div className="flex gap-1">
-                                <div
-                                  className="w-2 h-2 rounded-full bg-current animate-bounce"
-                                  style={{ animationDelay: "0ms" }}
-                                />
-                                <div
-                                  className="w-2 h-2 rounded-full bg-current animate-bounce"
-                                  style={{ animationDelay: "150ms" }}
-                                />
-                                <div
-                                  className="w-2 h-2 rounded-full bg-current animate-bounce"
-                                  style={{ animationDelay: "300ms" }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                  )}
+                  <div
+                    className={`max-w-[80%] rounded-lg p-3 ${msg.role === "assistant"
+                        ? "bg-muted"
+                        : "bg-primary text-primary-foreground"
+                      }`}
+                  >
+                    <p className="text-xs font-semibold mb-1 opacity-70 mb-1">
+                      {msg.role === "assistant" ? "Assistant" : "Simulated User"}
+                    </p>
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                  {msg.role !== "assistant" && (
+                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0 text-primary-foreground">
+                      <User className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {simulationState.messages.length === 0 && !simulationState.isActive && (
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center opacity-50">
+                  <Bot className="h-12 w-12 mb-4" />
+                  <p>Start the conversation to see the simulation in action</p>
                 </div>
               )}
             </CardContent>
