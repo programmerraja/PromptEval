@@ -7,9 +7,10 @@ import {
     EvalResult,
     PromptVersion,
     EvaluationPrompt,
+    Settings,
 } from "@/lib/db";
 import { generateObject, generateText, tool } from "ai";
-import { getAIClient, AIConfig } from "@/lib/ai";
+import { getAIClient, LLMConfig } from "@/lib/ai-utils";
 import { z } from "zod";
 
 export class EvaluationService {
@@ -44,9 +45,10 @@ export class EvaluationService {
     async runSingleTurn(
         entry: DatasetEntry,
         systemPrompt: string,
-        config: AIConfig
+        config: LLMConfig,
+        settings: Settings | null
     ): Promise<ConversationMessage[]> {
-        const client = await getAIClient(config.provider);
+        const client = getAIClient(config, settings);
 
         // For single turn, input is from dataset entry
         const input = entry.input || "";
@@ -71,8 +73,9 @@ export class EvaluationService {
     async runMultiTurnSimulation(
         entry: DatasetEntry,
         assistantSystemPrompt: string,
-        assistantConfig: AIConfig,
-        userConfig: AIConfig,
+        assistantConfig: LLMConfig,
+        userConfig: LLMConfig,
+        settings: Settings | null,
         maxTurns: number = 10
     ): Promise<ConversationMessage[]> {
         const messages: ConversationMessage[] = [];
@@ -100,7 +103,7 @@ export class EvaluationService {
                 currentSpeaker === "assistant"
                     ? assistantSystemPrompt
                     : userSystemPrompt;
-            const client = await getAIClient(config.provider);
+            const client = getAIClient(config, settings);
 
             // Map roles for the simulator perspective
             // If I am the User Simulator, I see 'assistant' messages as 'user' (inputs to me)
@@ -160,9 +163,11 @@ export class EvaluationService {
         conversation: Conversation,
         entry: DatasetEntry,
         evalPrompt: EvaluationPrompt,
-        evalConfig: AIConfig
+        evalConfig: LLMConfig,
+        settings: Settings | null,
+        metadata?: { provider?: string; model?: string }
     ): Promise<EvalResult> {
-        const client = await getAIClient(evalConfig.provider);
+        const client = getAIClient(evalConfig, settings);
 
         // 1. Prepare Eval Prompt
         const conversationText = conversation.messages
@@ -283,6 +288,8 @@ export class EvaluationService {
             eval_type: entry.type,
             metrics: metrics,
             timestamp: new Date().toISOString(),
+            provider: metadata?.provider,
+            model: metadata?.model,
         };
 
         await db.eval_results.add(evalResult);

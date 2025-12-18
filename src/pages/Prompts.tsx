@@ -82,7 +82,9 @@ const Prompts = () => {
               max_tokens: 500,
               top_p: 0.9,
               system_prompt: "",
-              model: "gpt-4o-mini"
+
+              model: "gemini-1.5-flash",
+              provider: "google"
             },
             created_at: new Date().toISOString()
           }
@@ -151,7 +153,9 @@ const Prompts = () => {
         max_tokens: currentVersion?.config.max_tokens || 500,
         top_p: currentVersion?.config.top_p || 0.9,
         system_prompt: currentVersion?.config.system_prompt || "",
-        model: currentVersion?.config.model || "gpt-4o-mini"
+
+        model: currentVersion?.config.model || "gemini-1.5-flash",
+        provider: currentVersion?.config.provider || "google"
       },
       created_at: new Date().toISOString()
     };
@@ -377,29 +381,14 @@ const Prompts = () => {
                 </div>
 
                 <ModelConfig
-                  model={selectedPrompt?.versions[selectedVersion]?.config.model || "models/gemini-flash-latest"}
-                  temperature={selectedPrompt?.versions[selectedVersion]?.config.temperature || 0.7}
-                  maxTokens={selectedPrompt?.versions[selectedVersion]?.config.max_tokens || 500}
-                  topP={selectedPrompt?.versions[selectedVersion]?.config.top_p || 0.9}
-                  onModelChange={(model) => {
-                    if (selectedPrompt) {
-                      const updatedPrompt = {
-                        ...selectedPrompt,
-                        versions: {
-                          ...selectedPrompt.versions,
-                          [selectedVersion]: {
-                            ...selectedPrompt.versions[selectedVersion],
-                            config: {
-                              ...selectedPrompt.versions[selectedVersion].config,
-                              model
-                            }
-                          }
-                        }
-                      };
-                      setSelectedPrompt(updatedPrompt);
-                    }
+                  config={{
+                    model: selectedPrompt?.versions[selectedVersion]?.config.model || "gemini-1.5-flash",
+                    provider: selectedPrompt?.versions[selectedVersion]?.config.provider || "google",
+                    temperature: selectedPrompt?.versions[selectedVersion]?.config.temperature || 0.7,
+                    maxTokens: selectedPrompt?.versions[selectedVersion]?.config.max_tokens || 500,
+                    topP: selectedPrompt?.versions[selectedVersion]?.config.top_p || 0.9,
                   }}
-                  onTemperatureChange={(temperature) => {
+                  onConfigChange={(newConfig) => {
                     if (selectedPrompt) {
                       const updatedPrompt = {
                         ...selectedPrompt,
@@ -409,43 +398,11 @@ const Prompts = () => {
                             ...selectedPrompt.versions[selectedVersion],
                             config: {
                               ...selectedPrompt.versions[selectedVersion].config,
-                              temperature
-                            }
-                          }
-                        }
-                      };
-                      setSelectedPrompt(updatedPrompt);
-                    }
-                  }}
-                  onMaxTokensChange={(max_tokens) => {
-                    if (selectedPrompt) {
-                      const updatedPrompt = {
-                        ...selectedPrompt,
-                        versions: {
-                          ...selectedPrompt.versions,
-                          [selectedVersion]: {
-                            ...selectedPrompt.versions[selectedVersion],
-                            config: {
-                              ...selectedPrompt.versions[selectedVersion].config,
-                              max_tokens
-                            }
-                          }
-                        }
-                      };
-                      setSelectedPrompt(updatedPrompt);
-                    }
-                  }}
-                  onTopPChange={(top_p) => {
-                    if (selectedPrompt) {
-                      const updatedPrompt = {
-                        ...selectedPrompt,
-                        versions: {
-                          ...selectedPrompt.versions,
-                          [selectedVersion]: {
-                            ...selectedPrompt.versions[selectedVersion],
-                            config: {
-                              ...selectedPrompt.versions[selectedVersion].config,
-                              top_p
+                              model: newConfig.model,
+                              provider: newConfig.provider,
+                              temperature: newConfig.temperature,
+                              max_tokens: newConfig.maxTokens,
+                              top_p: newConfig.topP
                             }
                           }
                         }
@@ -454,8 +411,6 @@ const Prompts = () => {
                     }
                   }}
                   showProvider={true}
-                  provider="google"
-                  onProviderChange={() => { }}
                   title="Model Parameters"
                   description="Configure the model settings for this prompt version"
                 />

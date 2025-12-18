@@ -16,10 +16,8 @@ import ConversationTabs from "./ConversationTabs";
 import ABTestingPanel from "./ABTestingPanel";
 import VariableEditor from "./VariableEditor";
 import UsageStats from "./UsageStats";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
+import { getAIClient } from "@/lib/ai-utils";
 
 interface LLMConfig {
   provider: "openai" | "anthropic" | "google";
@@ -133,25 +131,15 @@ const Playground = ({
     setEditableSystemPrompt(systemPrompt);
   }, [promptText, systemPrompt]);
 
-  const getAIClient = (config: LLMConfig) => {
-    if (!settings) throw new Error("Settings not loaded");
-
-    switch (config.provider) {
-      case "openai":
-        if (!settings.api_keys?.openai)
-          throw new Error("OpenAI API key not configured");
-        return createOpenAI({ apiKey: settings.api_keys.openai });
-      case "anthropic":
-        if (!settings.api_keys?.anthropic)
-          throw new Error("Anthropic API key not configured");
-        return createAnthropic({ apiKey: settings.api_keys.anthropic });
-      case "google":
-        if (!settings.api_keys?.google)
-          throw new Error("Google API key not configured");
-        return createGoogleGenerativeAI({ apiKey: settings.api_keys.google });
-      default:
-        throw new Error("Unknown provider");
-    }
+  const getClient = (config: LLMConfig) => {
+    return getAIClient({
+      provider: config.provider,
+      model: config.model,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+      topP: config.topP,
+      apiKey: settings?.api_keys?.[config.provider] // Pass explicit key if available or let util handle settings
+    }, settings);
   };
 
   const updateUsageStats = (usage: any, latency: number) => {
@@ -228,7 +216,7 @@ const Playground = ({
     conversationId: string,
     userMessage: string
   ): Promise<string> => {
-    const client = getAIClient(config);
+    const client = getClient(config);
     const conversation = conversations.find((c) => c.id === conversationId);
     if (!conversation) throw new Error("Conversation not found");
 
@@ -542,8 +530,10 @@ const Playground = ({
     config: ABTestConfig,
     userMessage: string
   ): Promise<string> => {
-    const client = getAIClient({
-      provider: "google", // Default to Google for A/B testing
+    const client = getClient({
+      // User said "on playground we have hardcoded provider some place use from prompt level"
+      // So I should try to use the config from the ABTestConfig if possible.
+      provider: config.provider,
       model: config.model,
       temperature: config.temperature,
       maxTokens: config.maxTokens,
@@ -693,17 +683,24 @@ const Playground = ({
 
           <TabsContent value="model" className="flex-1 p-4 overflow-y-auto">
             <ModelConfig
-              model={config.model}
-              temperature={config.temperature}
-              maxTokens={config.maxTokens}
-              topP={config.topP || 0.9}
-              onModelChange={(model) => setConfig({ ...config, model })}
-              onTemperatureChange={(temperature) => setConfig({ ...config, temperature })}
-              onMaxTokensChange={(maxTokens) => setConfig({ ...config, maxTokens })}
-              onTopPChange={(topP) => setConfig({ ...config, topP })}
+              config={{
+                model: config.model,
+                temperature: config.temperature,
+                maxTokens: config.maxTokens,
+                topP: config.topP || 0.9,
+                provider: config.provider,
+              }}
+              onConfigChange={(newConfig) => {
+                setConfig({
+                  ...config,
+                  model: newConfig.model,
+                  temperature: newConfig.temperature,
+                  maxTokens: newConfig.maxTokens,
+                  topP: newConfig.topP,
+                  provider: newConfig.provider as any,
+                });
+              }}
               showProvider={true}
-              provider={config.provider}
-              onProviderChange={(provider) => setConfig({ ...config, provider })}
               title="Model Configuration"
               description="Configure the AI model and parameters"
             />

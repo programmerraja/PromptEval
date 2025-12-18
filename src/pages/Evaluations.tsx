@@ -43,7 +43,7 @@ import { toast } from "@/hooks/use-toast";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import EvaluationPromptManager from "@/components/EvaluationPromptManager";
-import ModelConfig from "@/components/ModelConfig";
+import ModelConfig, { ModelConfiguration } from "@/components/ModelConfig";
 import SingleTurnEvaluation from "@/components/SingleTurnEvaluation";
 import { evaluationService } from "@/services/EvaluationService";
 import { aggregationService } from "@/services/AggregationService";
@@ -63,14 +63,23 @@ const Evaluations = () => {
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<string>("");
   const [selectedVersion, setSelectedVersion] = useState<string>("");
-  const [model, setModel] = useState<string>("models/gemini-flash-latest");
-  const [temperature, setTemperature] = useState<number>(0.7);
-  const [maxTokens, setMaxTokens] = useState<number>(500);
-  const [topP, setTopP] = useState<number>(0.9);
+  const [assistantConfig, setAssistantConfig] = useState<ModelConfiguration>({
+    model: "models/gemini-flash-latest",
+    provider: "google",
+    temperature: 0.7,
+    maxTokens: 500,
+    topP: 0.9,
+  });
+
   const [useCustomEvaluator, setUseCustomEvaluator] = useState<boolean>(false);
   const [evaluatorModel, setEvaluatorModel] = useState<string>("models/gemini-flash-latest");
+  const [evaluatorProvider, setEvaluatorProvider] = useState<string>("google");
   const [evaluatorPrompt, setEvaluatorPrompt] = useState<string>("");
   const [selectedCustomPrompt, setSelectedCustomPrompt] = useState<string>("");
+
+  const [filterPromptId, setFilterPromptId] = useState<string>("all");
+  const [filterMetric, setFilterMetric] = useState<string>("all");
+  const [filterMinScore, setFilterMinScore] = useState<string>("");
 
   // Run state
   const [isRunning, setIsRunning] = useState(false);
@@ -88,10 +97,13 @@ const Evaluations = () => {
       const prompt = prompts.find(p => p.id === selectedPrompt);
       const version = prompt?.versions[selectedVersion];
       if (version?.config) {
-        setModel("models/gemini-flash-latest");
-        setTemperature(version.config.temperature || 0.7);
-        setMaxTokens(version.config.max_tokens || 500);
-        setTopP(version.config.top_p || 0.9);
+        setAssistantConfig({
+          model: version.config.model || "gemini-1.5-flash",
+          provider: version.config.provider || "google",
+          temperature: version.config.temperature || 0.7,
+          maxTokens: version.config.max_tokens || 500,
+          topP: version.config.top_p || 0.9,
+        });
       }
     }
   }, [selectedPrompt, selectedVersion, prompts]);
@@ -136,11 +148,8 @@ const Evaluations = () => {
     }
 
     const settings = await db.settings.get("default");
-    const apiKey = settings?.api_keys?.google; // Default check, but service checks per provider
-
-    if (!apiKey && model.includes('gemini')) {
-      // Ideally check based on provider, but basic check here
-    }
+    // Removed explicit API key extraction as it is handled by the shared client via settings
+    // if (!apiKey && assistantConfig.model.includes('gemini')) { ... } check removed
 
     const selectedDatasetsList = getSelectedDatasets();
     const prompt = getSelectedPrompt();
@@ -155,13 +164,13 @@ const Evaluations = () => {
     setError("");
     setActiveTab("run");
 
-    const assistantConfig = {
-      provider: "google" as const,
-      model: model,
-      temperature: temperature,
-      maxTokens: maxTokens,
-      topP: topP,
-      apiKey: apiKey
+    const assistantServiceConfig = {
+      provider: assistantConfig.provider as "openai" | "anthropic" | "google",
+      model: assistantConfig.model,
+      temperature: assistantConfig.temperature,
+      maxTokens: assistantConfig.maxTokens,
+      topP: assistantConfig.topP,
+      // apiKey removed, implicitly used from settings in service
     };
 
     const userConfig = {
@@ -172,7 +181,7 @@ const Evaluations = () => {
     };
 
     const evalConfig = {
-      provider: "google" as const,
+      provider: useCustomEvaluator ? evaluatorProvider as any : "google" as const,
       model: useCustomEvaluator ? evaluatorModel : "models/gemini-flash-latest",
       temperature: 0.1,
       maxTokens: 2000
@@ -212,14 +221,15 @@ const Evaluations = () => {
 
         if (entry.type === 'single-turn') {
           const systemPrompt = promptVersion.config.system_prompt;
-          messages = await evaluationService.runSingleTurn(entry, systemPrompt, assistantConfig);
+          messages = await evaluationService.runSingleTurn(entry, systemPrompt, assistantServiceConfig, settings || null);
         } else {
           const assistantSystemPrompt = `${promptVersion.config.system_prompt}\n\n${promptVersion.text}`;
           messages = await evaluationService.runMultiTurnSimulation(
             entry,
             assistantSystemPrompt,
-            assistantConfig,
-            userConfig
+            assistantServiceConfig,
+            userConfig,
+            settings || null
           );
         }
 
@@ -229,7 +239,7 @@ const Evaluations = () => {
           id: convId,
           prompt_id: selectedPrompt,
           prompt_version: selectedVersion,
-          model: model,
+          model: assistantConfig.model,
           type: "auto_eval",
           messages: messages,
           metadata: {
@@ -243,7 +253,14 @@ const Evaluations = () => {
         await db.conversations.add(conversation);
 
         // 2. Evaluate
-        await evaluationService.evaluateConversation(conversation, entry, evalPromptObj, evalConfig);
+        await evaluationService.evaluateConversation(
+          conversation,
+          entry,
+          evalPromptObj,
+          evalConfig,
+          settings || null,
+          { provider: assistantConfig.provider, model: assistantConfig.model }
+        );
 
         setProgress(((i + 1) / totalEntries) * 100);
       }
@@ -297,9 +314,27 @@ const Evaluations = () => {
     }
 
     // Dynamic Table Logic
-    const latestResults = evalResults.slice().reverse();
+    // Apply Filters
+    let filteredResults = evalResults.slice().reverse();
+
+    if (filterPromptId !== "all") {
+      filteredResults = filteredResults.filter(r => r.prompt_id === filterPromptId);
+    }
+
+    if (filterMetric !== "all" && filterMinScore !== "") {
+      const minScore = parseFloat(filterMinScore);
+      if (!isNaN(minScore)) {
+        filteredResults = filteredResults.filter(r => {
+          const val = r.metrics[filterMetric];
+          return typeof val === 'number' && val >= minScore;
+        });
+      }
+    }
+
+    const latestResults = filteredResults;
+
     const allKeys = new Set<string>();
-    latestResults.slice(0, 20).forEach(r => Object.keys(r.metrics).forEach(k => allKeys.add(k)));
+    evalResults.forEach(r => Object.keys(r.metrics).forEach(k => allKeys.add(k))); // Use ALL results for keys, so columns trigger consistent layout
     const metricKeys = Array.from(allKeys);
 
     // Aggregation Logic (Simple Layer 1 Overview)
@@ -307,6 +342,62 @@ const Evaluations = () => {
 
     return (
       <div className="space-y-6">
+        {/* Filters */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Filter Results</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Filter by Prompt</Label>
+              <Select value={filterPromptId} onValueChange={setFilterPromptId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Prompts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Prompts</SelectItem>
+                  {prompts.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Filter by Metric</Label>
+              <Select value={filterMetric} onValueChange={setFilterMetric}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Metric" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any Metric</SelectItem>
+                  {metricKeys.map(k => (
+                    <SelectItem key={k} value={k} className="capitalize">{k.replace(/_/g, ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Min Score</Label>
+              <Input
+                type="number"
+                placeholder="e.g. 3"
+                value={filterMinScore}
+                onChange={(e) => setFilterMinScore(e.target.value)}
+                disabled={filterMetric === "all"}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button variant="outline" onClick={() => {
+                setFilterPromptId("all");
+                setFilterMetric("all");
+                setFilterMinScore("");
+              }} className="w-full">
+                Clear Filters
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Layer 1: Overview */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
@@ -336,6 +427,7 @@ const Evaluations = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Prompt</TableHead>
+                    <TableHead>Model</TableHead>
                     <TableHead className="w-[200px]">Dataset Entry</TableHead>
                     {metricKeys.map(key => (
                       <TableHead key={key} className="capitalize">{key.replace(/_/g, ' ')}</TableHead>
@@ -349,6 +441,12 @@ const Evaluations = () => {
                     <TableRow key={result.id}>
                       <TableCell>
                         {prompts.find((p) => p.id === result.prompt_id)?.name || "Unknown"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{result.model || "Unknown"}</span>
+                          <span className="text-xs text-muted-foreground">{result.provider || "Unknown"}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs truncate max-w-[200px]" title={result.dataset_entry_id}>
                         {result.dataset_entry_id}
@@ -416,10 +514,10 @@ const Evaluations = () => {
             onSelectedPromptChange={setSelectedPrompt}
             selectedVersion={selectedVersion}
             onSelectedVersionChange={setSelectedVersion}
-            model={model}
-            temperature={temperature}
-            maxTokens={maxTokens}
-            topP={topP}
+            model={assistantConfig.model}
+            temperature={assistantConfig.temperature}
+            maxTokens={assistantConfig.maxTokens}
+            topP={assistantConfig.topP}
             useCustomEvaluator={useCustomEvaluator}
             onUseCustomEvaluatorChange={setUseCustomEvaluator}
             evaluatorModel={evaluatorModel}
@@ -440,17 +538,9 @@ const Evaluations = () => {
 
         <TabsContent value="model-config" className="space-y-4">
           <ModelConfig
-            model={model}
-            temperature={temperature}
-            maxTokens={maxTokens}
-            topP={topP}
-            onModelChange={setModel}
-            onTemperatureChange={setTemperature}
-            onMaxTokensChange={setMaxTokens}
-            onTopPChange={setTopP}
-            onProviderChange={() => { }}
+            config={assistantConfig}
+            onConfigChange={setAssistantConfig}
             showProvider={true}
-            provider="google"
             title="Model Parameters"
             description="Configure the model settings for evaluation"
           />

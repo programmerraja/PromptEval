@@ -5,42 +5,46 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { configService } from "@/services/configService";
 
-interface ModelConfigProps {
+export interface ModelConfiguration {
+  provider: string;
   model: string;
   temperature: number;
   maxTokens: number;
   topP: number;
-  onModelChange: (model: string) => void;
-  onTemperatureChange: (temperature: number) => void;
-  onMaxTokensChange: (maxTokens: number) => void;
-  onTopPChange: (topP: number) => void;
+}
+
+interface ModelConfigProps {
+  config: ModelConfiguration;
+  onConfigChange: (config: ModelConfiguration) => void;
   title?: string;
   description?: string;
-  showProvider?: boolean;
-  provider?: "openai" | "anthropic" | "google";
-  onProviderChange?: (provider: "openai" | "anthropic" | "google") => void;
   className?: string;
+  showProvider?: boolean;
 }
 
 const ModelConfig = ({
-  model,
-  temperature,
-  maxTokens,
-  topP,
-  onModelChange,
-  onTemperatureChange,
-  onMaxTokensChange,
-  onTopPChange,
+  config,
+  onConfigChange,
   title = "Model Configuration",
   description = "Configure model parameters",
-  showProvider = true,
-  provider = "openai",
-  onProviderChange,
-  className = ""
+  className = "",
+  showProvider = true
 }: ModelConfigProps) => {
   const getModelsForProvider = (provider: string) => {
     const providerConfig = configService.getProviderConfig(provider);
     return providerConfig?.models.map(m => m.name) || [];
+  };
+
+  const handleChange = (key: keyof ModelConfiguration, value: any) => {
+    const newConfig = { ...config, [key]: value };
+    // Reset model if provider changes
+    if (key === 'provider' && value !== config.provider) {
+      const models = getModelsForProvider(value);
+      if (models.length > 0) {
+        newConfig.model = models[0];
+      }
+    }
+    onConfigChange(newConfig);
   };
 
   return (
@@ -50,10 +54,13 @@ const ModelConfig = ({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {showProvider && onProviderChange && (
+        {showProvider && (
           <div className="space-y-2">
             <Label>Provider</Label>
-            <Select value={provider} onValueChange={onProviderChange}>
+            <Select
+              value={config.provider}
+              onValueChange={(val) => handleChange('provider', val)}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -68,13 +75,16 @@ const ModelConfig = ({
 
         <div className="space-y-2">
           <Label>Model</Label>
-          <Select value={model} onValueChange={onModelChange}>
+          <Select
+            value={config.model}
+            onValueChange={(val) => handleChange('model', val)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select model" />
             </SelectTrigger>
             <SelectContent>
-              {getModelsForProvider(provider).map((modelOption) => {
-                const modelConfig = configService.getModelConfig(provider, modelOption);
+              {getModelsForProvider(config.provider).map((modelOption) => {
+                const modelConfig = configService.getModelConfig(config.provider, modelOption);
                 return (
                   <SelectItem key={modelOption} value={modelOption}>
                     {modelConfig?.displayName || modelOption}
@@ -88,12 +98,12 @@ const ModelConfig = ({
         <div className="space-y-4">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Label>Temperature: {temperature}</Label>
+              <Label>Temperature: {config.temperature}</Label>
               <span className="text-sm text-muted-foreground">0.0 - 2.0</span>
             </div>
             <Slider
-              value={[temperature]}
-              onValueChange={([value]) => onTemperatureChange(value)}
+              value={[config.temperature]}
+              onValueChange={([value]) => handleChange('temperature', value)}
               min={0}
               max={2}
               step={0.1}
@@ -107,12 +117,12 @@ const ModelConfig = ({
 
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Label>Max Tokens: {maxTokens}</Label>
+              <Label>Max Tokens: {config.maxTokens}</Label>
               <span className="text-sm text-muted-foreground">1 - 4096</span>
             </div>
             <Slider
-              value={[maxTokens]}
-              onValueChange={([value]) => onMaxTokensChange(value)}
+              value={[config.maxTokens]}
+              onValueChange={([value]) => handleChange('maxTokens', value)}
               min={1}
               max={4096}
               step={1}
@@ -126,12 +136,12 @@ const ModelConfig = ({
 
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Label>Top P: {topP}</Label>
+              <Label>Top P: {config.topP}</Label>
               <span className="text-sm text-muted-foreground">0.0 - 1.0</span>
             </div>
             <Slider
-              value={[topP]}
-              onValueChange={([value]) => onTopPChange(value)}
+              value={[config.topP]}
+              onValueChange={([value]) => handleChange('topP', value)}
               min={0}
               max={1}
               step={0.1}
@@ -152,8 +162,8 @@ const ModelConfig = ({
               step="0.1"
               min="0"
               max="2"
-              value={temperature}
-              onChange={(e) => onTemperatureChange(parseFloat(e.target.value) || 0)}
+              value={config.temperature}
+              onChange={(e) => handleChange('temperature', parseFloat(e.target.value) || 0)}
             />
           </div>
           <div className="space-y-2">
@@ -162,8 +172,8 @@ const ModelConfig = ({
               type="number"
               min="1"
               max="4096"
-              value={maxTokens}
-              onChange={(e) => onMaxTokensChange(parseInt(e.target.value) || 1)}
+              value={config.maxTokens}
+              onChange={(e) => handleChange('maxTokens', parseInt(e.target.value) || 1)}
             />
           </div>
         </div>

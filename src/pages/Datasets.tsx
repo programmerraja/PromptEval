@@ -12,6 +12,349 @@ import { DatasetEntryDialog } from "@/components/DatasetEntryDialog";
 import { DatasetMetadataDialog } from "@/components/DatasetMetadataDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
+// --- Subcomponents ---
+
+interface DatasetSidebarProps {
+  datasets: Dataset[];
+  selectedDataset: Dataset | null;
+  onSelectDataset: (ds: Dataset) => void;
+  onDeleteDataset: (id: string) => void;
+  onNewDataset: () => void;
+  filterType: "all" | "single" | "multi";
+  onFilterTypeChange: (type: "all" | "single" | "multi") => void;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
+}
+
+const DatasetSidebar = ({
+  datasets,
+  selectedDataset,
+  onSelectDataset,
+  onDeleteDataset,
+  onNewDataset,
+  filterType,
+  onFilterTypeChange,
+  searchQuery,
+  onSearchQueryChange
+}: DatasetSidebarProps) => {
+  const filteredDatasets = datasets.filter(ds => {
+    const matchesType = filterType === "all" ||
+      (filterType === "single" && ds.type === "single-turn") ||
+      (filterType === "multi" && ds.type === "multi-turn");
+    const matchesSearch = searchQuery === "" ||
+      ds.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ds.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesType && matchesSearch;
+  });
+
+  return (
+    <div className="w-80 border-r border-border flex flex-col">
+      <div className="p-4 border-b border-border space-y-4">
+        <Button onClick={onNewDataset} className="w-full" size="sm">
+          <Plus className="h-4 w-4 mr-2" />
+          New Dataset
+        </Button>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search datasets..."
+            value={searchQuery}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+            className="pl-10 h-10"
+          />
+        </div>
+      </div>
+
+      <div className="px-4 py-3 border-b border-border">
+        <Tabs value={filterType} onValueChange={(v) => onFilterTypeChange(v as any)} className="w-full">
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="single">Single</TabsTrigger>
+            <TabsTrigger value="multi">Multi</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-3">
+          {filteredDatasets.map((dataset) => (
+            <div key={dataset.id} className="relative group">
+              <Card
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedDataset?.id === dataset.id
+                  ? "ring-2 ring-primary bg-primary/5"
+                  : "hover:bg-muted/50"
+                  }`}
+                onClick={() => onSelectDataset(dataset)}
+              >
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <h3 className="font-semibold text-sm leading-tight">{dataset.name}</h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteDataset(dataset.id);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={dataset.type === "single-turn" ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {dataset.type === "single-turn" ? "Single Turn" : "Multi Turn"}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {dataset.entries.length} entries
+                        </Badge>
+                      </div>
+
+                      {dataset.tags && dataset.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {dataset.tags.slice(0, 3).map(tag => (
+                            <Badge key={tag} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {dataset.tags.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{dataset.tags.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {dataset.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {dataset.description}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ))}
+
+          {filteredDatasets.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No datasets found</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+};
+
+interface DatasetDetailsProps {
+  selectedDataset: Dataset | null;
+  onEditMetadata: () => void;
+  onAddEntry: () => void;
+  onEditEntry: (entry: DatasetEntry) => void;
+  onDeleteEntry: (entryId: string) => void;
+}
+
+const DatasetDetails = ({
+  selectedDataset,
+  onEditMetadata,
+  onAddEntry,
+  onEditEntry,
+  onDeleteEntry
+}: DatasetDetailsProps) => {
+  if (!selectedDataset) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        <div className="text-center">
+          <Plus className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="text-lg">Select a dataset or create a new one</p>
+          <p className="text-sm mt-2">Choose from the sidebar to view and manage your datasets</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 p-6">
+      <div className="space-y-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 space-y-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold">{selectedDataset.name}</h2>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onEditMetadata}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {selectedDataset.description && (
+              <p className="text-muted-foreground text-base">{selectedDataset.description}</p>
+            )}
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={selectedDataset.type === "single-turn" ? "default" : "secondary"}
+                  className="text-sm"
+                >
+                  {selectedDataset.type === "single-turn" ? "Single Turn" : "Multi Turn"}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {selectedDataset.entries.length} entries
+                </span>
+              </div>
+
+              {selectedDataset.tags && selectedDataset.tags.length > 0 && (
+                <div className="flex gap-2">
+                  {selectedDataset.tags.map(tag => (
+                    <Badge key={tag} variant="outline" className="text-sm">{tag}</Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button onClick={onAddEntry}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Entry
+            </Button>
+            <Button variant="outline">
+              <TestTube className="h-4 w-4 mr-2" />
+              Send to Eval
+            </Button>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Dataset Entries</CardTitle>
+                <CardDescription className="mt-1">
+                  {selectedDataset.entries.length} {selectedDataset.entries.length === 1 ? "entry" : "entries"} in this dataset
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {selectedDataset.entries.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground">
+                <Plus className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                <h3 className="text-lg font-medium mb-2">No entries yet</h3>
+                <p className="text-sm mb-4">Add your first entry to get started with this dataset</p>
+                <Button onClick={onAddEntry}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Entry
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {selectedDataset.entries.map((entry) => (
+                  <Card key={entry.id} className="overflow-hidden">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <CardTitle className="text-lg">{entry.title || "Untitled Entry"}</CardTitle>
+                          <Badge
+                            variant={entry.type === "single-turn" ? "default" : "secondary"}
+                            className="text-xs"
+                          >
+                            {entry.type === "single-turn" ? "Single Turn" : "Multi Turn"}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onEditEntry(entry)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDeleteEntry(entry.id)}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {entry.type === "single-turn" ? (
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-sm font-medium mb-2 text-foreground">Input:</p>
+                            <div className="bg-muted/30 p-4 rounded-lg border">
+                              <p className="text-sm text-foreground">{entry.input}</p>
+                            </div>
+                          </div>
+                          {entry.expected_behavior && (
+                            <div>
+                              <p className="text-sm font-medium mb-2 text-foreground">Expected Behavior:</p>
+                              <div className="bg-muted/30 p-4 rounded-lg border">
+                                <p className="text-sm text-foreground">{entry.expected_behavior}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {entry.extractedPrompt && (
+                            <div>
+                              <p className="text-sm font-medium mb-2 text-foreground">Extracted Prompt / Context:</p>
+                              <div className="bg-muted/30 p-4 rounded-lg border">
+                                <p className="text-sm text-foreground whitespace-pre-wrap">{entry.extractedPrompt}</p>
+                              </div>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm font-medium mb-3 text-foreground">Conversation:</p>
+                            <div className="space-y-3 max-h-60 overflow-y-auto">
+                              {entry.conversation?.map((msg, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`p-4 rounded-lg border ${msg.role === "user"
+                                    ? "bg-primary/5 border-primary/20 ml-6"
+                                    : "bg-muted/30 border-border mr-6"
+                                    }`}
+                                >
+                                  <p className="text-xs font-medium mb-2 capitalize text-muted-foreground">{msg.role}</p>
+                                  <p className="text-sm text-foreground">{msg.content}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
 const Datasets = () => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
@@ -31,6 +374,10 @@ const Datasets = () => {
   const loadDatasets = async () => {
     const allDatasets = await db.datasets.toArray();
     setDatasets(allDatasets);
+    if (selectedDataset) {
+      const updated = allDatasets.find(d => d.id === selectedDataset.id);
+      if (updated) setSelectedDataset(updated);
+    }
   };
 
   const handleSaveMetadata = async (metadata: { name: string; type: "single-turn" | "multi-turn"; description?: string; tags?: string[]; extraction_prompt?: string }) => {
@@ -103,6 +450,7 @@ const Datasets = () => {
     if (!deleteDatasetId) return;
 
     await db.datasets.delete(deleteDatasetId);
+    // If we are deleting the selected dataset, deselect it
     if (selectedDataset?.id === deleteDatasetId) {
       setSelectedDataset(null);
     }
@@ -115,340 +463,33 @@ const Datasets = () => {
     });
   };
 
-  const filteredDatasets = datasets.filter(ds => {
-    const matchesType = filterType === "all" ||
-      (filterType === "single" && ds.type === "single-turn") ||
-      (filterType === "multi" && ds.type === "multi-turn");
-    const matchesSearch = searchQuery === "" ||
-      ds.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ds.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesType && matchesSearch;
-  });
-
   return (
     <>
       <div className="flex h-[calc(100vh-4rem)] w-full">
-        <div className="w-80 border-r border-border flex flex-col">
-          <div className="p-4 border-b border-border space-y-4">
-            <Button onClick={() => setMetadataDialogOpen(true)} className="w-full" size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              New Dataset
-            </Button>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search datasets..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-10"
-              />
-            </div>
-          </div>
-
-          <div className="px-4 py-3 border-b border-border">
-            <Tabs value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)} className="w-full">
-              <TabsList className="w-full grid grid-cols-3">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="single">Single</TabsTrigger>
-                <TabsTrigger value="multi">Multi</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-3">
-              {filteredDatasets.map((dataset) => (
-                <div key={dataset.id} className="relative group">
-                  <Card
-                    className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedDataset?.id === dataset.id
-                      ? "ring-2 ring-primary bg-primary/5"
-                      : "hover:bg-muted/50"
-                      }`}
-                    onClick={() => setSelectedDataset(dataset)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <h3 className="font-semibold text-sm leading-tight">{dataset.name}</h3>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteDatasetId(dataset.id);
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={dataset.type === "single-turn" ? "default" : "secondary"}
-                              className="text-xs"
-                            >
-                              {dataset.type === "single-turn" ? "Single Turn" : "Multi Turn"}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {dataset.entries.length} entries
-                            </Badge>
-                          </div>
-
-                          {dataset.tags && dataset.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {dataset.tags.slice(0, 3).map(tag => (
-                                <Badge key={tag} variant="secondary" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                              {dataset.tags.length > 3 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{dataset.tags.length - 3}
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {dataset.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {dataset.description}
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-
-              {filteredDatasets.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No datasets found</p>
-                  {searchQuery && (
-                    <p className="text-xs mt-1">Try adjusting your search terms</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-
-        <div className="flex-1 p-6">
-          {!selectedDataset ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              <div className="text-center">
-                <Plus className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <p className="text-lg">Select a dataset or create a new one</p>
-                <p className="text-sm mt-2">Choose from the sidebar to view and manage your datasets</p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-bold">{selectedDataset.name}</h2>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setMetadataDialogOpen(true)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <Settings2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  {selectedDataset.description && (
-                    <p className="text-muted-foreground text-base">{selectedDataset.description}</p>
-                  )}
-
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={selectedDataset.type === "single-turn" ? "default" : "secondary"}
-                        className="text-sm"
-                      >
-                        {selectedDataset.type === "single-turn" ? "Single Turn" : "Multi Turn"}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {selectedDataset.entries.length} entries
-                      </span>
-                    </div>
-
-                    {selectedDataset.tags && selectedDataset.tags.length > 0 && (
-                      <div className="flex gap-2">
-                        {selectedDataset.tags.map(tag => (
-                          <Badge key={tag} variant="outline" className="text-sm">{tag}</Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button onClick={() => {
-                    setEditingEntry(undefined);
-                    setEntryDialogOpen(true);
-                  }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Entry
-                  </Button>
-                  <Button variant="outline">
-                    <TestTube className="h-4 w-4 mr-2" />
-                    Send to Eval
-                  </Button>
-                </div>
-              </div>
-
-              <Card>
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">Dataset Entries</CardTitle>
-                      <CardDescription className="mt-1">
-                        {selectedDataset.entries.length} {selectedDataset.entries.length === 1 ? "entry" : "entries"} in this dataset
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {selectedDataset.entries.length === 0 ? (
-                    <div className="text-center py-16 text-muted-foreground">
-                      <Plus className="h-16 w-16 mx-auto mb-4 opacity-20" />
-                      <h3 className="text-lg font-medium mb-2">No entries yet</h3>
-                      <p className="text-sm mb-4">Add your first entry to get started with this dataset</p>
-                      <Button onClick={() => {
-                        setEditingEntry(undefined);
-                        setEntryDialogOpen(true);
-                      }}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add First Entry
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {selectedDataset.entries.map((entry) => (
-                        <Card key={entry.id} className="overflow-hidden">
-                          <CardHeader className="pb-4">
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center gap-3">
-                                <CardTitle className="text-lg">{entry.title || "Untitled Entry"}</CardTitle>
-                                <Badge
-                                  variant={entry.type === "single-turn" ? "default" : "secondary"}
-                                  className="text-xs"
-                                >
-                                  {entry.type === "single-turn" ? "Single Turn" : "Multi Turn"}
-                                </Badge>
-                              </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    setEditingEntry(entry);
-                                    setEntryDialogOpen(true);
-                                  }}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => setDeleteEntryId(entry.id)}
-                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            {entry.type === "single-turn" ? (
-                              <div className="space-y-4">
-                                <div>
-                                  <p className="text-sm font-medium mb-2 text-foreground">Input:</p>
-                                  <div className="bg-muted/30 p-4 rounded-lg border">
-                                    <p className="text-sm text-foreground">{entry.input}</p>
-                                  </div>
-                                </div>
-                                {entry.expected_behavior && (
-                                  <div>
-                                    <p className="text-sm font-medium mb-2 text-foreground">Expected Behavior:</p>
-                                    <div className="bg-muted/30 p-4 rounded-lg border">
-                                      <p className="text-sm text-foreground">{entry.expected_behavior}</p>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="space-y-4">
-                                {entry.system_context && (
-                                  <div>
-                                    <p className="text-sm font-medium mb-2 text-foreground">System Context:</p>
-                                    <div className="bg-muted/30 p-4 rounded-lg border">
-                                      <p className="text-sm text-foreground">{entry.system_context}</p>
-                                    </div>
-                                  </div>
-                                )}
-                                <div>
-                                  <p className="text-sm font-medium mb-3 text-foreground">Conversation:</p>
-                                  <div className="space-y-3">
-                                    {entry.conversation?.map((msg, idx) => (
-                                      <div
-                                        key={idx}
-                                        className={`p-4 rounded-lg border ${msg.role === "user"
-                                          ? "bg-primary/5 border-primary/20 ml-6"
-                                          : "bg-muted/30 border-border mr-6"
-                                          }`}
-                                      >
-                                        <p className="text-xs font-medium mb-2 capitalize text-muted-foreground">{msg.role}</p>
-                                        <p className="text-sm text-foreground">{msg.content}</p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                {entry.user_behavior && (
-                                  <div>
-                                    <p className="text-sm font-medium mb-2 text-foreground">User Behavior:</p>
-                                    <div className="bg-muted/30 p-4 rounded-lg border space-y-2">
-                                      {entry.user_behavior.style && (
-                                        <p className="text-sm">
-                                          <span className="font-medium text-foreground">Style:</span>
-                                          <span className="text-muted-foreground ml-2">{entry.user_behavior.style}</span>
-                                        </p>
-                                      )}
-                                      {entry.user_behavior.formality && (
-                                        <p className="text-sm">
-                                          <span className="font-medium text-foreground">Formality:</span>
-                                          <span className="text-muted-foreground ml-2">{entry.user_behavior.formality}</span>
-                                        </p>
-                                      )}
-                                      {entry.user_behavior.goal && (
-                                        <p className="text-sm">
-                                          <span className="font-medium text-foreground">Goal:</span>
-                                          <span className="text-muted-foreground ml-2">{entry.user_behavior.goal}</span>
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
+        <DatasetSidebar
+          datasets={datasets}
+          selectedDataset={selectedDataset}
+          onSelectDataset={setSelectedDataset}
+          onDeleteDataset={setDeleteDatasetId}
+          onNewDataset={() => setMetadataDialogOpen(true)}
+          filterType={filterType}
+          onFilterTypeChange={setFilterType}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+        />
+        <DatasetDetails
+          selectedDataset={selectedDataset}
+          onEditMetadata={() => setMetadataDialogOpen(true)}
+          onAddEntry={() => {
+            setEditingEntry(undefined);
+            setEntryDialogOpen(true);
+          }}
+          onEditEntry={(entry) => {
+            setEditingEntry(entry);
+            setEntryDialogOpen(true);
+          }}
+          onDeleteEntry={setDeleteEntryId}
+        />
       </div>
 
       <DatasetEntryDialog

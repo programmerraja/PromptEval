@@ -21,6 +21,7 @@ export interface PromptVersion {
     top_p: number;
     system_prompt: string;
     model?: string;
+    provider?: string;
   };
   created_at: string;
 
@@ -106,6 +107,8 @@ export interface EvalResult {
   metrics: Record<string, any>;
   reason?: string;
   timestamp: string;
+  provider?: string;
+  model?: string;
   cost?: {
     eval_tokens: number;
     cost_estimate: number;
