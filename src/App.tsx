@@ -4,9 +4,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
 import { initializeSettings } from "@/lib/db";
+import DashboardLayout from "./layouts/DashboardLayout";
+import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Prompts from "./pages/Prompts";
 import Datasets from "./pages/Datasets";
@@ -27,23 +27,20 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <SidebarProvider>
-            <div className="flex min-h-screen w-full">
-              <AppSidebar />
-              <main className="flex-1 overflow-auto">
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/prompts" element={<Prompts />} />
-                  <Route path="/datasets" element={<Datasets />} />
-                  <Route path="/evaluations" element={<Evaluations />} />
-                  <Route path="/multi-chat" element={<MultiChat />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
-            </div>
-          </SidebarProvider>
+        <BrowserRouter basename="/prompteval">
+          <Routes>
+
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/dashboard" element={<DashboardLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="prompts" element={<Prompts />} />
+              <Route path="datasets" element={<Datasets />} />
+              <Route path="evaluations" element={<Evaluations />} />
+              <Route path="multi-chat" element={<MultiChat />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

@@ -173,7 +173,7 @@ const DatasetDetails = ({
 }: DatasetDetailsProps) => {
   if (!selectedDataset) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div className="flex items-center justify-center h-full text-muted-foreground w-full">
         <div className="text-center">
           <Plus className="h-12 w-12 mx-auto mb-4 opacity-20" />
           <p className="text-lg">Select a dataset or create a new one</p>
@@ -465,7 +465,7 @@ const Datasets = () => {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-4rem)] w-full">
+      <div className="flex h-[calc(100vh)] w-full">
         <DatasetSidebar
           datasets={datasets}
           selectedDataset={selectedDataset}

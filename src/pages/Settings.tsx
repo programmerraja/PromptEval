@@ -8,13 +8,14 @@ import { useState, useEffect, useRef } from "react";
 import { db, Prompt, Dataset, Conversation, Evaluation, EvalResult, PlaygroundSession, EvaluationPrompt, ExtractionPrompt, type Settings } from "@/lib/db";
 import { toast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 const Settings = () => {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [showOpenAI, setShowOpenAI] = useState(false);
   const [showAnthropic, setShowAnthropic] = useState(false);
   const [showGoogle, setShowGoogle] = useState(false);
-  
+
   const [storageUsage, setStorageUsage] = useState<{
     prompts: number;
     datasets: number;
@@ -66,8 +67,8 @@ const Settings = () => {
         db.settings.count()
       ]);
 
-      const total = prompts + datasets + conversations + evaluations + evalResults + 
-                   playgroundSessions + evaluationPrompts + extractionPrompts + settings;
+      const total = prompts + datasets + conversations + evaluations + evalResults +
+        playgroundSessions + evaluationPrompts + extractionPrompts + settings;
 
       setStorageUsage({
         prompts,
@@ -315,14 +316,14 @@ const Settings = () => {
               <div className="space-y-2">
                 <Label>OpenAI API Key</Label>
                 <div className="flex gap-2">
-                  <Input 
+                  <Input
                     type={showOpenAI ? "text" : "password"}
                     placeholder="sk-..."
                     value={settings.api_keys?.openai || ''}
                     onChange={(e) => updateApiKey('openai', e.target.value)}
                   />
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="icon"
                     onClick={() => setShowOpenAI(!showOpenAI)}
                   >
@@ -333,14 +334,14 @@ const Settings = () => {
               <div className="space-y-2">
                 <Label>Anthropic API Key</Label>
                 <div className="flex gap-2">
-                  <Input 
+                  <Input
                     type={showAnthropic ? "text" : "password"}
                     placeholder="sk-ant-..."
                     value={settings.api_keys?.anthropic || ''}
                     onChange={(e) => updateApiKey('anthropic', e.target.value)}
                   />
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="icon"
                     onClick={() => setShowAnthropic(!showAnthropic)}
                   >
@@ -351,14 +352,14 @@ const Settings = () => {
               <div className="space-y-2">
                 <Label>Google API Key</Label>
                 <div className="flex gap-2">
-                  <Input 
+                  <Input
                     type={showGoogle ? "text" : "password"}
                     placeholder="AIza..."
                     value={settings.api_keys?.google || ''}
                     onChange={(e) => updateApiKey('google', e.target.value)}
                   />
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="icon"
                     onClick={() => setShowGoogle(!showGoogle)}
                   >
@@ -384,7 +385,7 @@ const Settings = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Model</Label>
-                  <Input 
+                  <Input
                     value={settings.dataset_generator_config?.model || ''}
                     onChange={(e) => setSettings({
                       ...settings,
@@ -397,8 +398,8 @@ const Settings = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Temperature</Label>
-                  <Input 
-                    type="number" 
+                  <Input
+                    type="number"
                     step="0.1"
                     value={settings.dataset_generator_config?.temperature || 0.5}
                     onChange={(e) => setSettings({
@@ -412,7 +413,7 @@ const Settings = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Max Tokens</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.dataset_generator_config?.max_tokens || 100}
                     onChange={(e) => setSettings({
@@ -426,8 +427,8 @@ const Settings = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Top P</Label>
-                  <Input 
-                    type="number" 
+                  <Input
+                    type="number"
                     step="0.1"
                     value={settings.dataset_generator_config?.top_p || 0.9}
                     onChange={(e) => setSettings({
@@ -458,7 +459,7 @@ const Settings = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Default Evaluation Model</Label>
-                  <Input 
+                  <Input
                     value={settings.default_model?.model || ''}
                     onChange={(e) => setSettings({
                       ...settings,
@@ -471,8 +472,8 @@ const Settings = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Temperature</Label>
-                  <Input 
-                    type="number" 
+                  <Input
+                    type="number"
                     step="0.1"
                     value={settings.default_model?.temperature || 0.5}
                     onChange={(e) => setSettings({
@@ -486,7 +487,7 @@ const Settings = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Max Tokens</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.default_model?.max_tokens || 100}
                     onChange={(e) => setSettings({
@@ -500,8 +501,8 @@ const Settings = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Top P</Label>
-                  <Input 
-                    type="number" 
+                  <Input
+                    type="number"
                     step="0.1"
                     value={settings.default_model?.top_p || 0.9}
                     onChange={(e) => setSettings({
@@ -533,7 +534,7 @@ const Settings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="global-extraction-prompt">Extraction Prompt</Label>
-                <textarea
+                <Textarea
                   id="global-extraction-prompt"
                   value={settings.global_extraction_prompt || ""}
                   onChange={(e) => setSettings({
@@ -564,7 +565,7 @@ const Settings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="default-evaluation-prompt">Evaluation Prompt</Label>
-                <textarea
+                <Textarea
                   id="default-evaluation-prompt"
                   value={settings.default_evaluation_prompt || ""}
                   onChange={(e) => setSettings({
@@ -638,8 +639,8 @@ const Settings = () => {
                       <p className="text-sm text-muted-foreground mb-3">
                         Download all your data as a JSON file for backup or migration.
                       </p>
-                      <Button 
-                        onClick={exportAllData} 
+                      <Button
+                        onClick={exportAllData}
                         disabled={isExporting}
                         className="w-full"
                       >
@@ -663,7 +664,7 @@ const Settings = () => {
                           onChange={importData}
                           className="hidden"
                         />
-                        <Button 
+                        <Button
                           onClick={() => fileInputRef.current?.click()}
                           disabled={isImporting}
                           variant="outline"
@@ -685,7 +686,7 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground mb-3">
                     Permanently delete all data and reset to defaults. This action cannot be undone.
                   </p>
-                  <Button 
+                  <Button
                     onClick={() => setShowClearDialog(true)}
                     variant="destructive"
                     className="w-full"

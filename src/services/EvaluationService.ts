@@ -165,7 +165,8 @@ export class EvaluationService {
         evalPrompt: EvaluationPrompt,
         evalConfig: LLMConfig,
         settings: Settings | null,
-        metadata?: { provider?: string; model?: string }
+        metadata?: { provider?: string; model?: string },
+        snapshot?: EvalResult['snapshot']
     ): Promise<EvalResult> {
         const client = getAIClient(evalConfig, settings);
 
@@ -285,11 +286,13 @@ export class EvaluationService {
             conversation_id: conversation.id,
             prompt_id: conversation.prompt_id,
             dataset_entry_id: entry.id,
+            evaluation_prompt_id: evalPrompt.id,
             eval_type: entry.type,
             metrics: metrics,
             timestamp: new Date().toISOString(),
             provider: metadata?.provider,
             model: metadata?.model,
+            snapshot: snapshot,
         };
 
         await db.eval_results.add(evalResult);

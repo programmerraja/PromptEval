@@ -41,7 +41,7 @@ const Dashboard = () => {
   const getLastEval = (prompt: Prompt) => {
     const versions = Object.values(prompt.versions || {});
     if (versions.length === 0) return "Never";
-    const latest = versions.sort((a, b) => 
+    const latest = versions.sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )[0];
     const days = Math.floor((Date.now() - new Date(latest.created_at).getTime()) / (1000 * 60 * 60 * 24));
@@ -56,11 +56,11 @@ const Dashboard = () => {
           <p className="text-muted-foreground">Overview of your prompt evaluation workspace</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => navigate("/prompts")} size="sm">
+          <Button onClick={() => navigate("/dashboard/prompts")} size="sm">
             <Plus className="h-4 w-4 mr-2" />
             New Prompt
           </Button>
-          <Button onClick={() => navigate("/evaluations")} size="sm" variant="outline">
+          <Button onClick={() => navigate("/dashboard/evaluations")} size="sm" variant="outline">
             <Play className="h-4 w-4 mr-2" />
             Run Eval
           </Button>
@@ -90,7 +90,7 @@ const Dashboard = () => {
           <CardHeader className="pb-2">
             <CardDescription>Avg Score</CardDescription>
             <CardTitle className="text-3xl">
-              {prompts.length > 0 
+              {prompts.length > 0
                 ? ((prompts.reduce((acc, p) => acc + parseFloat(getAvgScore(p)), 0) / prompts.length).toFixed(1))
                 : "0.0"}
             </CardTitle>
@@ -114,7 +114,7 @@ const Dashboard = () => {
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
               <p>No prompts yet. Create your first prompt to get started.</p>
-              <Button onClick={() => navigate("/prompts")} className="mt-4" size="sm">
+              <Button onClick={() => navigate("/dashboard/prompts")} className="mt-4" size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Prompt
               </Button>
@@ -142,10 +142,10 @@ const Dashboard = () => {
                     <TableCell>gpt-4o-mini</TableCell>
                     <TableCell className="text-muted-foreground">{getLastEval(prompt)}</TableCell>
                     <TableCell>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="sm"
-                        onClick={() => navigate(`/prompts?id=${prompt.id}`)}
+                        onClick={() => navigate(`/dashboard/prompts?id=${prompt.id}`)}
                       >
                         View
                       </Button>

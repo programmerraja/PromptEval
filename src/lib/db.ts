@@ -103,12 +103,19 @@ export interface EvalResult {
   conversation_id: string;
   prompt_id: string;
   dataset_entry_id: string;
+  evaluation_prompt_id?: string;
   eval_type: 'single-turn' | 'multi-turn';
   metrics: Record<string, any>;
   reason?: string;
   timestamp: string;
   provider?: string;
   model?: string;
+  snapshot?: {
+    system_prompt: string;
+    user_input?: string;
+    assistant_response?: string;
+    messages?: ConversationMessage[];
+  };
   cost?: {
     eval_tokens: number;
     cost_estimate: number;

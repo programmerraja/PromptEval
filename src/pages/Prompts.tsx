@@ -283,7 +283,7 @@ const Prompts = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full">
+    <div className="flex h-[calc(100vh)] w-full">
       <div className="w-64 border-r border-border">
         <div className="p-4 border-b border-border">
           <Button onClick={createNewPrompt} className="w-full" size="sm">
@@ -338,7 +338,7 @@ const Prompts = () => {
 
       <div className="flex-1">
         {!selectedPrompt ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
+          <div className="flex items-center justify-center h-full text-muted-foreground w-full">
             <div className="text-center">
               <Plus className="h-12 w-12 mx-auto mb-4 opacity-20" />
               <p>Select a prompt or create a new one</p>
@@ -405,9 +405,20 @@ const Prompts = () => {
                               top_p: newConfig.topP
                             }
                           }
-                        }
+                        },
+                        updated_at: new Date().toISOString()
                       };
                       setSelectedPrompt(updatedPrompt);
+
+                      // Fix: Persist to DB immediately
+                      db.prompts.update(updatedPrompt.id, updatedPrompt).catch(err => {
+                        console.error("Failed to auto-save config:", err);
+                        toast({
+                          title: "Auto-save failed",
+                          description: "Failed to save model configuration",
+                          variant: "destructive"
+                        });
+                      });
                     }
                   }}
                   showProvider={true}

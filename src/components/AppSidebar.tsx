@@ -1,10 +1,10 @@
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Database, 
-  BarChart3, 
-  MessageSquare, 
-  Settings 
+import {
+  LayoutDashboard,
+  FileText,
+  Database,
+  BarChart3,
+  MessageSquare,
+  Settings
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Prompts", url: "/prompts", icon: FileText },
-  { title: "Datasets", url: "/datasets", icon: Database },
-  { title: "Evaluations", url: "/evaluations", icon: BarChart3 },
-  { title: "Multi-Chat", url: "/multi-chat", icon: MessageSquare },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Prompts", url: "/dashboard/prompts", icon: FileText },
+  { title: "Datasets", url: "/dashboard/datasets", icon: Database },
+  { title: "Evaluations", url: "/dashboard/evaluations", icon: BarChart3 },
+  { title: "Multi-Chat", url: "/dashboard/multi-chat", icon: MessageSquare },
+  { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -41,7 +41,7 @@ export function AppSidebar() {
           </div>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
@@ -49,9 +49,9 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      end={item.url === "/"}
+                    <NavLink
+                      to={item.url}
+                      end={item.url === "/dashboard"}
                       className={({ isActive }) =>
                         isActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
