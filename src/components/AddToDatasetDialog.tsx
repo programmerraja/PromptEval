@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,14 +37,14 @@ const AddToDatasetDialog = ({
   const [entryInput, setEntryInput] = useState("");
   const [entryExpectedBehavior, setEntryExpectedBehavior] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Extraction prompt state
   const [extractionPrompt, setExtractionPrompt] = useState("");
   const [settings, setSettings] = useState<any>(null);
   const [extractedData, setExtractedData] = useState<string>("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [activeTab, setActiveTab] = useState<"extract" | "manual">("extract");
-  
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -91,7 +92,7 @@ const AddToDatasetDialog = ({
       // For single-turn, use the first user message as input and first assistant message as expected behavior
       const userMessage = messages.find(m => m.role === "user");
       const assistantMessage = messages.find(m => m.role === "assistant");
-      
+
       setEntryInput(userMessage?.content || "");
       setEntryExpectedBehavior(assistantMessage?.content || "");
     } else {
@@ -115,7 +116,7 @@ const AddToDatasetDialog = ({
         .map(msg => `${msg.role}: ${msg.content}`)
         .join('\n\n');
 
-      
+
       const client = createGoogleGenerativeAI({
         apiKey: settings.api_keys?.google || process.env.GOOGLE_API_KEY,
       });
@@ -128,7 +129,7 @@ const AddToDatasetDialog = ({
 
       // Set the extracted text directly
       setExtractedData(text);
-      
+
       // Use the extracted text as the expected behavior
       setEntryExpectedBehavior(text);
     } catch (error) {
@@ -239,7 +240,7 @@ const AddToDatasetDialog = ({
         type: promptType,
         title: entryTitle.trim(),
         input: promptType === "single-turn" ? entryInput.trim() || extractedData.trim() : undefined,
-        prompt: promptType === "multi-turn" ? entryInput.trim() || extractedData.trim() :undefined,
+        prompt: promptType === "multi-turn" ? entryInput.trim() || extractedData.trim() : undefined,
         conversation: promptType === "multi-turn" ? messages : undefined,
         created_at: new Date().toISOString(),
       };
@@ -300,10 +301,10 @@ const AddToDatasetDialog = ({
           {/* Dataset Selection */}
           <div className="space-y-4">
             <Label className="text-base font-medium">Dataset</Label>
-            
+
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   type="radio"
                   id="existing-dataset"
                   name="dataset-type"
@@ -315,7 +316,7 @@ const AddToDatasetDialog = ({
                   Use existing dataset
                 </Label>
               </div>
-              
+
               {!createNewDataset && (
                 <Select value={selectedDatasetId} onValueChange={setSelectedDatasetId}>
                   <SelectTrigger>
@@ -339,7 +340,7 @@ const AddToDatasetDialog = ({
               )}
 
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   type="radio"
                   id="new-dataset"
                   name="dataset-type"
@@ -351,7 +352,7 @@ const AddToDatasetDialog = ({
                   Create new dataset
                 </Label>
               </div>
-              
+
               {createNewDataset && (
                 <div className="space-y-3 pl-6">
                   <div>
@@ -385,7 +386,7 @@ const AddToDatasetDialog = ({
           {/* Entry Details */}
           <div className="space-y-4">
             <Label className="text-base font-medium">Entry Details</Label>
-            
+
             <div>
               <Label htmlFor="entry-title">Title</Label>
               <Input

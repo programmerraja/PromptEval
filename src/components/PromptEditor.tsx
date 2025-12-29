@@ -127,7 +127,7 @@ const PromptEditor = ({
 
     onCreateVersion(newVersion);
     onVersionChange(newVersionId);
-    
+
     toast({
       title: "Version created",
       description: `New version ${newVersionId} has been created successfully`
@@ -161,12 +161,12 @@ const PromptEditor = ({
             placeholder="Description"
           />
         </div>
-        
+
         <div className="space-y-2">
           <Label>Prompt Type</Label>
           <div className="flex gap-4">
             <div className="flex items-center space-x-2">
-              <input
+              <Input
                 type="radio"
                 id="single-turn"
                 name="prompt-type"
@@ -180,7 +180,7 @@ const PromptEditor = ({
               </Label>
             </div>
             <div className="flex items-center space-x-2">
-              <input
+              <Input
                 type="radio"
                 id="multi-turn"
                 name="prompt-type"
@@ -195,13 +195,13 @@ const PromptEditor = ({
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            {editingPrompt.type === "single-turn" 
+            {editingPrompt.type === "single-turn"
               ? "Single turn prompts generate one response per user input"
               : "Multi turn prompts support ongoing conversations"
             }
           </p>
         </div>
-        
+
         <div className="flex gap-2">
           <Button onClick={handleSave} size="sm">
             <Save className="h-4 w-4 mr-2" />

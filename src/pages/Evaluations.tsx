@@ -93,9 +93,9 @@ const Evaluations = () => {
     setSettings(settingsData);
 
     // Set default evaluation prompt from settings if not set
-    if (!evaluatorPrompt && settingsData?.default_evaluation_prompt) {
-      setEvaluatorPrompt(settingsData.default_evaluation_prompt);
-    }
+    // if (!evaluatorPrompt && settingsData?.default_evaluation_prompt) {
+    //   setEvaluatorPrompt(settingsData.default_evaluation_prompt);
+    // }
   };
 
   const getSelectedPrompt = () => {

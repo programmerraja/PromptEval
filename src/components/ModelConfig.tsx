@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -95,11 +96,11 @@ const ModelConfig = ({
           </Select>
         </div>
 
-        <div className="space-y-4">
+        {/* <div className="space-y-4">
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label>Temperature: {config.temperature}</Label>
-              <span className="text-sm text-muted-foreground">0.0 - 2.0</span>
+              <span className="text-sm text-muted-foreground">0.0 -1.0</span>
             </div>
             <Slider
               value={[config.temperature]}
@@ -152,7 +153,7 @@ const ModelConfig = ({
               <span>More diverse</span>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-2 gap-4 pt-4 border-t">
           <div className="space-y-2">
@@ -176,6 +177,20 @@ const ModelConfig = ({
               onChange={(e) => handleChange('maxTokens', parseInt(e.target.value) || 1)}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label>Top P (Input)</Label>
+            <Input
+              type="number"
+              min="0"
+              max="1"
+              step="0.1"
+              value={config.topP}
+              onChange={(e) => handleChange('topP', parseFloat(e.target.value) || 0)}
+            />
+          </div>
+
+
         </div>
       </CardContent>
     </Card>

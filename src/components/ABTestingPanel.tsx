@@ -140,16 +140,15 @@ const ABTestingPanel = ({
               {testConfigs.map((config) => (
                 <Card
                   key={config.id}
-                  className={`transition-colors ${
-                    activeConfigId === config.id
-                      ? "ring-2 ring-primary"
-                      : "hover:bg-muted/50"
-                  }`}
+                  className={`transition-colors ${activeConfigId === config.id
+                    ? "ring-2 ring-primary"
+                    : "hover:bg-muted/50"
+                    }`}
                 >
                   <CardContent className="p-3">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <h5 
+                        <h5
                           className="font-medium text-sm cursor-pointer flex-1"
                           onClick={() => setActiveConfigId(config.id)}
                         >
@@ -174,7 +173,7 @@ const ABTestingPanel = ({
                           )}
                         </div>
                       </div>
-                      
+
                       {editingConfigId === config.id ? (
                         <div className="space-y-2">
                           <div className="grid grid-cols-2 gap-2">
@@ -182,7 +181,7 @@ const ABTestingPanel = ({
                               <Label className="text-xs">Provider</Label>
                               <Select
                                 value={editingConfig.provider || config.provider}
-                                onValueChange={(value) => setEditingConfig({...editingConfig, provider: value as "openai" | "anthropic" | "google"})}
+                                onValueChange={(value) => setEditingConfig({ ...editingConfig, provider: value as "openai" | "anthropic" | "google" })}
                               >
                                 <SelectTrigger className="h-8 text-xs">
                                   <SelectValue />
@@ -198,7 +197,7 @@ const ABTestingPanel = ({
                               <Label className="text-xs">Model</Label>
                               <Input
                                 value={editingConfig.model || config.model}
-                                onChange={(e) => setEditingConfig({...editingConfig, model: e.target.value})}
+                                onChange={(e) => setEditingConfig({ ...editingConfig, model: e.target.value })}
                                 className="h-8 text-xs"
                               />
                             </div>
@@ -212,7 +211,7 @@ const ABTestingPanel = ({
                                 min="0"
                                 max="2"
                                 value={editingConfig.temperature || config.temperature}
-                                onChange={(e) => setEditingConfig({...editingConfig, temperature: parseFloat(e.target.value)})}
+                                onChange={(e) => setEditingConfig({ ...editingConfig, temperature: parseFloat(e.target.value) })}
                                 className="h-8 text-xs"
                               />
                             </div>
@@ -221,7 +220,7 @@ const ABTestingPanel = ({
                               <Input
                                 type="number"
                                 value={editingConfig.maxTokens || config.maxTokens}
-                                onChange={(e) => setEditingConfig({...editingConfig, maxTokens: parseInt(e.target.value)})}
+                                onChange={(e) => setEditingConfig({ ...editingConfig, maxTokens: parseInt(e.target.value) })}
                                 className="h-8 text-xs"
                               />
                             </div>
@@ -233,7 +232,7 @@ const ABTestingPanel = ({
                                 min="0"
                                 max="1"
                                 value={editingConfig.topP || config.topP}
-                                onChange={(e) => setEditingConfig({...editingConfig, topP: parseFloat(e.target.value)})}
+                                onChange={(e) => setEditingConfig({ ...editingConfig, topP: parseFloat(e.target.value) })}
                                 className="h-8 text-xs"
                               />
                             </div>
@@ -293,21 +292,18 @@ const ABTestingPanel = ({
                     activeMessages.map((message, index) => (
                       <div
                         key={index}
-                        className={`flex gap-3 ${
-                          message.role === "assistant" ? "justify-end" : ""
-                        }`}
+                        className={`flex gap-3 ${message.role === "assistant" ? "justify-end" : ""
+                          }`}
                       >
                         <div
-                          className={`flex gap-3 max-w-[80%] ${
-                            message.role === "assistant" ? "flex-row-reverse" : ""
-                          }`}
+                          className={`flex gap-3 max-w-[80%] ${message.role === "assistant" ? "flex-row-reverse" : ""
+                            }`}
                         >
                           <div
-                            className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                              message.role === "user"
-                                ? "bg-primary/10"
-                                : "bg-secondary"
-                            }`}
+                            className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${message.role === "user"
+                              ? "bg-primary/10"
+                              : "bg-secondary"
+                              }`}
                           >
                             {message.role === "user" ? (
                               <User className="h-4 w-4" />
@@ -320,11 +316,10 @@ const ABTestingPanel = ({
                               {message.role === "user" ? "You" : "Assistant"}
                             </div>
                             <div
-                              className={`rounded-lg p-3 ${
-                                message.role === "user"
-                                  ? "bg-muted"
-                                  : "bg-primary text-primary-foreground"
-                              }`}
+                              className={`rounded-lg p-3 ${message.role === "user"
+                                ? "bg-muted"
+                                : "bg-primary text-primary-foreground"
+                                }`}
                             >
                               <div className="whitespace-pre-wrap">{message.content}</div>
                               {message.role === "assistant" && (
@@ -391,7 +386,7 @@ const ABTestingPanel = ({
 
               <div className="p-4 border-t">
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
                     onKeyDown={handleKeyPress}

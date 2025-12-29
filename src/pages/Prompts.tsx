@@ -283,7 +283,7 @@ const Prompts = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh)] w-full">
+    <div className="flex  w-full">
       <div className="w-64 border-r border-border">
         <div className="p-4 border-b border-border">
           <Button onClick={createNewPrompt} className="w-full" size="sm">

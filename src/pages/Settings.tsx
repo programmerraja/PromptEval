@@ -265,7 +265,7 @@ const Settings = () => {
           max_tokens: 100,
           top_p: 0.9
         },
-        default_evaluation_prompt: "You are an expert evaluator. Please evaluate the following conversation between a user and an AI assistant. Rate the assistant's performance on a scale of 1-5 for each criterion:\n\n1. Task Completion (1-5): How well did the assistant complete the requested task?\n2. Tone and Empathy (1-5): How appropriate and empathetic was the assistant's tone?\n3. Clarity (1-5): How clear and understandable were the assistant's responses?\n4. Overall Quality (1-5): Overall assessment of the assistant's performance\n\nPlease provide your evaluation in JSON format with scores and a brief reason for each criterion:\n\n{\n  \"task_completion\": {\n    \"score\": X,\n    \"reason\": \"...\"\n  },\n  \"tone_empathy\": {\n    \"score\": X,\n    \"reason\": \"...\"\n  },\n  \"clarity\": {\n    \"score\": X,\n    \"reason\": \"...\"\n  },\n  \"overall_quality\": {\n    \"score\": X,\n    \"reason\": \"...\"\n  }\n}",
+        // default_evaluation_prompt: "You are an expert evaluator. Please evaluate the following conversation between a user and an AI assistant. Rate the assistant's performance on a scale of 1-5 for each criterion:\n\n1. Task Completion (1-5): How well did the assistant complete the requested task?\n2. Tone and Empathy (1-5): How appropriate and empathetic was the assistant's tone?\n3. Clarity (1-5): How clear and understandable were the assistant's responses?\n4. Overall Quality (1-5): Overall assessment of the assistant's performance\n\nPlease provide your evaluation in JSON format with scores and a brief reason for each criterion:\n\n{\n  \"task_completion\": {\n    \"score\": X,\n    \"reason\": \"...\"\n  },\n  \"tone_empathy\": {\n    \"score\": X,\n    \"reason\": \"...\"\n  },\n  \"clarity\": {\n    \"score\": X,\n    \"reason\": \"...\"\n  },\n  \"overall_quality\": {\n    \"score\": X,\n    \"reason\": \"...\"\n  }\n}",
         global_extraction_prompt: "You are analyzing a multi-turn conversation between a user and an AI assistant. Extract the following information to create a dataset entry:\n\n1. User's input/query\n2. Assistant's response\n3. Conversation context\n4. Key topics discussed\n5. User's communication style\n6. Expected behavior or outcome\n\nPlease format your response as JSON with the following structure:\n\n{\n  \"user_input\": \"...\",\n  \"assistant_response\": \"...\",\n  \"context\": \"...\",\n  \"topics\": [\"...\"],\n  \"user_style\": \"...\",\n  \"expected_behavior\": \"...\"\n}"
       });
 
@@ -555,7 +555,7 @@ const Settings = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle>Default Evaluation Prompt</CardTitle>
               <CardDescription>
@@ -584,7 +584,7 @@ const Settings = () => {
                 Save Evaluation Prompt
               </Button>
             </CardContent>
-          </Card>
+          </Card> */}
         </TabsContent>
 
         <TabsContent value="storage" className="space-y-4">
@@ -657,7 +657,7 @@ const Settings = () => {
                         Import data from a previously exported JSON file.
                       </p>
                       <div className="space-y-2">
-                        <input
+                        <Input
                           ref={fileInputRef}
                           type="file"
                           accept=".json"
