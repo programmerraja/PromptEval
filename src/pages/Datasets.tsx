@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { db, Dataset, DatasetEntry } from "@/lib/db";
 import { Button } from "@/components/ui/button";
@@ -466,7 +465,7 @@ const Datasets = () => {
 
   return (
     <>
-      <div className="flex  w-full">
+      <div className="flex h-[calc(100vh)] w-full">
         <DatasetSidebar
           datasets={datasets}
           selectedDataset={selectedDataset}
